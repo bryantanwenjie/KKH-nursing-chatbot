@@ -3,6 +3,12 @@ import ast
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
 
+# --- THE MEMORY NUKE ---
+if "nuke_complete" not in st.session_state:
+    st.session_state.clear()
+    st.session_state.nuke_complete = True
+# -----------------------
+
 # The Final Fix: Importing from the classic package
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
@@ -12,10 +18,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
-
-# ... the rest of your app.py code ...
-
-# ... the rest of your UI and Agent logic ...
 
 st.success("✅ LangChain loaded successfully! The app is running.")
 
