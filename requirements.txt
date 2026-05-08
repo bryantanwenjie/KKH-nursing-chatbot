@@ -1,8 +1,8 @@
 streamlit
-langchain>=0.3.5
-langchain-community>=0.3.5
-langchain-core>=0.3.5
-langchain-google-genai>=2.0.0
+langchain
+langchain-community
+langchain-core
+langchain-google-genai
+langchain-chroma
 python-dotenv
 pypdf
-chromadbs
