@@ -1,3 +1,4 @@
+# Core requirements
 streamlit
 langchain
 langchain-google-genai
@@ -5,3 +6,9 @@ langchain-community
 langchain-chroma
 pypdf
 python-dotenv
+
+# Fix for the Protobuf/OpenTelemetry error
+protobuf==4.25.3
+opentelemetry-api==1.24.0
+opentelemetry-sdk==1.24.0
+opentelemetry-exporter-otlp-proto-grpc==1.24.0
