@@ -1,5 +1,5 @@
 import os
-import ast
+import re
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
 
@@ -118,28 +118,18 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
                 "chat_history": st.session_state.messages[:-1] 
             })
             
-            raw_output = response.get("output", "")
-            out_str = str(raw_output)
+            raw_output = str(response.get("output", ""))
             
-            # --- THE STRING CHOPPER ---
-            # If the string contains the messy Gemini signature formatting
-            if "'type': 'text'" in out_str and "'signature':" in out_str:
-                try:
-                    # Attempt 1: Safely evaluate it as code
-                    parsed = ast.literal_eval(out_str)
-                    full_response = parsed["text"]
-                except Exception:
-                    # Attempt 2: Physically chop the string apart
-                    try:
-                        # Split the string at the start and end of the text
-                        chopped = out_str.split("'text': '", 1).rsplit("', 'index':", 1)
-                        # Fix the line breaks so Markdown works
-                        full_response = chopped.replace('\\n', '\n')
-                    except Exception:
-                        full_response = out_str # Absolute fallback
+            # --- THE REGEX LASER ---
+            # This hunts exactly for the text between 'text': ' and ', 'index':
+            match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
+            
+            if match:
+                # Extract it and fix any broken newlines or quotes
+                full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'")
             else:
-                full_response = out_str
-            # --------------------------
+                full_response = raw_output
+            # -----------------------
 
             st.markdown(full_response)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
