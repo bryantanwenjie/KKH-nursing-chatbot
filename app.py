@@ -11,7 +11,6 @@ if "nuke_complete" not in st.session_state:
 
 # The Final Fix: Importing from the classic package
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
-
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -83,7 +82,14 @@ tools = [calculate_fluid_requirement, search_nursing_protocols]
 llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
 
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a KKH Clinical Nursing Assistant. Be precise and professional."),
+    ("system", """You are a strictly professional KKH Clinical Nursing Assistant. 
+    
+    Your ONLY purpose is to answer questions related to clinical protocols, nursing guidelines, and medical topics based on the provided KKH documents. 
+    
+    CRITICAL RULES:
+    1. If a user asks a question unrelated to healthcare, nursing, or KKH (e.g., recipes, general technology, movies, casual chat), you MUST politely refuse to answer. 
+    2. Do NOT use your general world knowledge to answer off-topic questions. 
+    3. If refusing, gently remind the user that you are a clinical assistant and ask how you can help with medical protocols today."""),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
