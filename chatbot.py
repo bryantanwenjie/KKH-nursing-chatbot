@@ -1,16 +1,18 @@
 ﻿import os
 from dotenv import load_dotenv
 
-# 1. Base LangChain and Google GenAI
+# 1. Base Framework
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
+
+# 2. Agent Logic
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+
+# 3. Google GenAI & RAG
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
-
-# 2. Agent and Tooling (Modern 2026 Paths)
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.tools import tool
-from langchain_core.prompts import ChatPromptTemplate
 
 # 1. SETUP & AUTHENTICATION
 load_dotenv()
