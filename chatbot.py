@@ -1,18 +1,18 @@
 ﻿import os
 from dotenv import load_dotenv
 
-# 1. Base Framework
+# 1. Base Framework Components
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 
-# 2. Agent Logic
+# 2. Agent Logic (The line that is currently failing)
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 
-# 3. Google GenAI & RAG
+# 3. Model & Data Storage
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma  # Updated to match requirements
+from langchain_chroma import Chroma  # Using the lighter 2026 version
 
 # 1. SETUP & AUTHENTICATION
 load_dotenv()
