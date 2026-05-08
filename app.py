@@ -89,6 +89,7 @@ prompt = ChatPromptTemplate.from_messages([
 agent = create_tool_calling_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
+
 # --- CHAT INTERFACE ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -97,43 +98,13 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if user_input := st.chat_input("How can I assist with clinical protocols today?"):
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
-    with st.chat_message("assistant"):
-        # 2. Wrap the execution in a try/except block to unmask any hidden errors
-        try:
-            response = agent_executor.invoke({
-                "input": user_input,
-                "chat_history": st.session_state.messages[:-1] 
-            })
-            full_response = response["output"]
-            st.markdown(full_response)
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-        except Exception as e:
-            st.error(f"🚨 Google API Error: {str(e)}")
-
-# --- CHAT INTERFACE ---
-# --- CHAT INTERFACE ---
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# 1. Print all past messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# 2. Wait for new input (OUTSIDE the loop)
+# ONLY ONE OF THESE SHOULD EXIST IN THE ENTIRE FILE
 if user_input := st.chat_input("How can I assist with clinical protocols today?"):
     
-    # Add user message to screen
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Generate and add assistant response
     with st.chat_message("assistant"):
         try:
             response = agent_executor.invoke({
