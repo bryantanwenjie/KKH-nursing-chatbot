@@ -76,7 +76,9 @@ def calculate_fluid_requirement(weight_kg: float) -> str:
 tools = [calculate_fluid_requirement, search_nursing_protocols]
 
 # --- AGENT SETUP ---
-llm = ChatGoogleGenerativeAI(model="gemini-3-flash", temperature=0)
+# 1. Update the model name to include the required suffix
+llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
+
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a KKH Clinical Nursing Assistant. Be precise and professional."),
     ("placeholder", "{chat_history}"),
@@ -86,6 +88,32 @@ prompt = ChatPromptTemplate.from_messages([
 
 agent = create_tool_calling_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+# --- CHAT INTERFACE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if user_input := st.chat_input("How can I assist with clinical protocols today?"):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        # 2. Wrap the execution in a try/except block to unmask any hidden errors
+        try:
+            response = agent_executor.invoke({
+                "input": user_input,
+                "chat_history": st.session_state.messages[:-1] 
+            })
+            full_response = response["output"]
+            st.markdown(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+        except Exception as e:
+            st.error(f"🚨 Google API Error: {str(e)}")
 
 # --- CHAT INTERFACE ---
 if "messages" not in st.session_state:
