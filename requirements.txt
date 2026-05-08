@@ -8,3 +8,5 @@ streamlit>=1.38.0
 pypdf>=4.3.1
 python-dotenv>=1.0.1
 protobuf<=3.20.3
+langchain-huggingface
+sentence-transformers

@@ -13,6 +13,7 @@ if "nuke_complete" not in st.session_state:
 # The Final Fix: Importing from the classic package
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -41,31 +42,25 @@ if "GOOGLE_API_KEY" in st.secrets:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
 # --- TOOLS & RAG ---
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def initialize_retriever():
     try:
-        loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf")
-        docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        chunks = text_splitter.split_documents(docs)
-        
-        # 1. Safely grab the API key directly from secrets
-        api_key = st.secrets.get("GOOGLE_API_KEY")
-        if not api_key:
-            raise ValueError("GOOGLE_API_KEY is completely missing from Streamlit Secrets!")
+        with st.spinner("Building unlimited Vector Database with Hugging Face..."):
+            loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf")
+            docs = loader.load()
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+            chunks = text_splitter.split_documents(docs)
 
-        # 2. Explicitly pass the key into the embedding function
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001", # <--- THE FIX IS HERE
-            google_api_key=api_key
-        )
-        
-        vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings)
-        return vectorstore.as_retriever()
+            # 1. Initialize the FREE local embedding model
+            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            
+            # 2. Process all chunks instantly (No rate limits!)
+            vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings)
+            
+            return vectorstore.as_retriever()
     
     except Exception as e:
-        # 3. This forces Streamlit to show us the UNREDACTED error
-        st.error(f"🚨 Google API Error: {str(e)}")
+        st.error(f"🚨 Vector DB Error: {str(e)}")
         st.stop()
 
 retriever = initialize_retriever()
