@@ -118,28 +118,28 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
                 "chat_history": st.session_state.messages[:-1] 
             })
             
-            raw_output = response.get("output", "No response.")
+            raw_output = response.get("output", "")
+            out_str = str(raw_output)
             
-            # --- THE ULTIMATE STRING DECODER ---
-            # 1. If LangChain squashed it into a string, convert it back to a list
-            if isinstance(raw_output, str) and raw_output.startswith("[{") and "'text':" in raw_output:
+            # --- THE STRING CHOPPER ---
+            # If the string contains the messy Gemini signature formatting
+            if "'type': 'text'" in out_str and "'signature':" in out_str:
                 try:
-                    raw_output = ast.literal_eval(raw_output)
+                    # Attempt 1: Safely evaluate it as code
+                    parsed = ast.literal_eval(out_str)
+                    full_response = parsed["text"]
                 except Exception:
-                    pass # If it fails to parse, leave it as a string
-
-            # 2. Now properly extract the text
-            if isinstance(raw_output, list) and len(raw_output) > 0:
-                item = raw_output
-                if isinstance(item, dict) and "text" in item:
-                    full_response = item["text"]
-                else:
-                    full_response = str(item)
-            elif isinstance(raw_output, dict) and "text" in raw_output:
-                full_response = raw_output["text"]
+                    # Attempt 2: Physically chop the string apart
+                    try:
+                        # Split the string at the start and end of the text
+                        chopped = out_str.split("'text': '", 1).rsplit("', 'index':", 1)
+                        # Fix the line breaks so Markdown works
+                        full_response = chopped.replace('\\n', '\n')
+                    except Exception:
+                        full_response = out_str # Absolute fallback
             else:
-                full_response = str(raw_output)
-            # -----------------------------------
+                full_response = out_str
+            # --------------------------
 
             st.markdown(full_response)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
