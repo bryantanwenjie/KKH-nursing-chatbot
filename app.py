@@ -1,4 +1,5 @@
 import os
+import ast
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
 
@@ -115,22 +116,30 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
                 "chat_history": st.session_state.messages[:-1] 
             })
             
-            # --- THE SLEDGEHAMMER CLEANER ---
-            def clean_text(data):
-                # If it's a list, look at the first thing inside it
-                if isinstance(data, list) and len(data) > 0:
-                    return clean_text(data)
-                # If it's a dictionary, look for the 'text' key
-                if isinstance(data, dict):
-                    return data.get("text", str(data))
-                # Otherwise, just return it as a string
-                return str(data)
+            raw_output = response.get("output", "No response.")
+            
+            # --- THE ULTIMATE STRING DECODER ---
+            # 1. If LangChain squashed it into a string, convert it back to a list
+            if isinstance(raw_output, str) and raw_output.startswith("[{") and "'text':" in raw_output:
+                try:
+                    raw_output = ast.literal_eval(raw_output)
+                except Exception:
+                    pass # If it fails to parse, leave it as a string
 
-            full_response = clean_text(response.get("output", "No response."))
-            # -------------------------------
+            # 2. Now properly extract the text
+            if isinstance(raw_output, list) and len(raw_output) > 0:
+                item = raw_output
+                if isinstance(item, dict) and "text" in item:
+                    full_response = item["text"]
+                else:
+                    full_response = str(item)
+            elif isinstance(raw_output, dict) and "text" in raw_output:
+                full_response = raw_output["text"]
+            else:
+                full_response = str(raw_output)
+            # -----------------------------------
 
             st.markdown(full_response)
-            # Save ONLY the clean string to history
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             
         except Exception as e:
