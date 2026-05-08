@@ -1,4 +1,4 @@
-import os
+﻿import os
 from dotenv import load_dotenv
 
 # Core LangChain and Google GenAI imports
@@ -24,17 +24,17 @@ if not api_key:
 # This facilitates the retrieval of accurate healthcare information [cite: 61, 93]
 def setup_knowledge_base():
     # Ensure this PDF exists in your project directory [cite: 53, 86]
-    loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf") 
+    loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf")
     docs = loader.load()
-    
+
     # Split text into manageable chunks for accurate retrieval
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     chunks = text_splitter.split_documents(docs)
-    
+
     # Generate embeddings and store in a local vector database
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     vectorstore = Chroma.from_documents(
-        documents=chunks, 
+        documents=chunks,
         embedding=embeddings,
         persist_directory="./chroma_db"
     )
@@ -47,14 +47,14 @@ def calculate_fluid_requirement(weight_kg: float) -> str:
     Calculates daily fluid requirements for a patient based on weight.
     Use this when a nurse asks for fluid calculations or clinical guidance[cite: 66, 96].
     """
-    # Standard formula for fluid requirement calculation 
+    # Standard formula for fluid requirement calculation
     if weight_kg <= 10:
         res = weight_kg * 100
     elif weight_kg <= 20:
         res = 1000 + (weight_kg - 10) * 50
     else:
         res = 1500 + (weight_kg - 20) * 20
-        
+
     return f"The calculated fluid requirement is {res} mL/day."
 
 # 4. INITIALIZE AGENT & GEMINI
@@ -80,16 +80,16 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 def main():
     print("--- KKH Nursing Chatbot Active ---")
     # This loop allows nurses to retrieve protocols and guidelines interactively [cite: 65, 95]
-    
+
     while True:
         user_input = input("Nurse Query (type 'exit' to quit): ")
         if user_input.lower() in ["exit", "quit"]:
             break
-            
+
         # Invoke the agent to determine if it should search protocols or use the tool
         try:
             response = agent.invoke({"messages": [{"role": "user", "content": user_input}]})
-            
+
             # Extract the last message from the response
             if isinstance(response, dict) and "messages" in response:
                 messages = response["messages"]
