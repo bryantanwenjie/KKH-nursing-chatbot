@@ -111,8 +111,20 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
                 "input": user_input,
                 "chat_history": st.session_state.messages[:-1] 
             })
-            full_response = response["output"]
+            
+            # --- THE FIX: Clean the raw Google API output ---
+            raw_output = response["output"]
+            
+            # If Google returns a list of dictionaries, extract just the 'text'
+            if isinstance(raw_output, list) and len(raw_output) > 0:
+                full_response = raw_output.get("text", str(raw_output))
+            else:
+                # If it's already a normal string, just use it
+                full_response = str(raw_output)
+            # ------------------------------------------------
+                
             st.markdown(full_response)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
+            
         except Exception as e:
             st.error(f"🚨 Error: {str(e)}")
