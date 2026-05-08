@@ -1,3 +1,4 @@
+import base64
 import os
 import re
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
@@ -22,6 +23,14 @@ st.success("✅ LangChain loaded successfully! The app is running.")
 
 # ... the rest of your app.py code ...
 
+# --- SIDEBAR: IMAGE UPLOAD ---
+with st.sidebar:
+    st.header("📷 Clinical Vision")
+    uploaded_image = st.file_uploader("Upload monitor, chart, or clinical image", type=["png", "jpg", "jpeg"])
+    
+    if uploaded_image:
+        st.image(uploaded_image, caption="Image ready for analysis", use_column_width=True)
+
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="KKH Nursing Assistant", page_icon="🏥")
 st.title("🏥 KKH Clinical Nursing Assistant")
@@ -30,7 +39,6 @@ st.title("🏥 KKH Clinical Nursing Assistant")
 if "GOOGLE_API_KEY" in st.secrets:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
-# --- TOOLS & RAG ---
 # --- TOOLS & RAG ---
 @st.cache_resource
 def initialize_retriever():
@@ -119,23 +127,36 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
 
     with st.chat_message("assistant"):
         try:
+            # 1. Check if we have an image to send
+            if uploaded_image is not None:
+                # Convert the image to base64
+                img_bytes = uploaded_image.getvalue()
+                encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                image_data = f"data:image/jpeg;base64,{encoded_img}"
+                
+                # Create a "Multimodal" payload (Text + Image)
+                agent_input = [
+                    {"type": "text", "text": user_input},
+                    {"type": "image_url", "image_url": {"url": image_data}}
+                ]
+            else:
+                # If no image, just send the normal text
+                agent_input = user_input
+
+            # 2. Run the agent with the new payload
             response = agent_executor.invoke({
-                "input": user_input,
+                "input": agent_input,
                 "chat_history": st.session_state.messages[:-1] 
             })
             
+            # 3. Clean the response (Using our Regex Laser from earlier)
             raw_output = str(response.get("output", ""))
-            
-            # --- THE REGEX LASER ---
-            # This hunts exactly for the text between 'text': ' and ', 'index':
             match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
             
             if match:
-                # Extract it and fix any broken newlines or quotes
                 full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'")
             else:
                 full_response = raw_output
-            # -----------------------
 
             st.markdown(full_response)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
