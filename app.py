@@ -116,24 +116,32 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
             st.error(f"🚨 Google API Error: {str(e)}")
 
 # --- CHAT INTERFACE ---
+# --- CHAT INTERFACE ---
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# 1. Print all past messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# 2. Wait for new input (OUTSIDE the loop)
 if user_input := st.chat_input("How can I assist with clinical protocols today?"):
+    
+    # Add user message to screen
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
+    # Generate and add assistant response
     with st.chat_message("assistant"):
-        response = agent_executor.invoke({
-            "input": user_input,
-            "chat_history": st.session_state.messages[:-1] 
-        })
-        full_response = response["output"]
-        st.markdown(full_response)
-    
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+        try:
+            response = agent_executor.invoke({
+                "input": user_input,
+                "chat_history": st.session_state.messages[:-1] 
+            })
+            full_response = response["output"]
+            st.markdown(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+        except Exception as e:
+            st.error(f"🚨 Error: {str(e)}")
