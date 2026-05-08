@@ -1,45 +1,81 @@
 import streamlit as st
-from chatbot import agent_executor, calculate_fluid_requirement  # Import your existing logic
-from langchain_community.chat_message_histories import StreamlitChatMessageHistory
+import os
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_chroma import Chroma
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 
-# 1. Page Configuration
-st.set_page_config(page_title="KKH Nursing Chatbot", page_icon="🩺")
-st.title("🩺 KKH Nursing Assistant")
-st.markdown("Retrieval of Protocols & Clinical Calculations")
+# --- PAGE CONFIG ---
+st.set_page_config(page_title="KKH Nursing Assistant", page_icon="🏥")
+st.title("🏥 KKH Clinical Nursing Assistant")
 
-# 2. Initialize Chat History
-# This stores messages in Streamlit's session_state automatically
-msgs = StreamlitChatMessageHistory(key="chat_messages")
+# --- AUTHENTICATION ---
+if "GOOGLE_API_KEY" in st.secrets:
+    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
-if len(msgs.messages) == 0:
-    msgs.add_ai_message("Hello! I am the KKH Nursing Assistant. How can I help you today?")
+# --- TOOLS & RAG ---
+@st.cache_resource
+def initialize_retriever():
+    loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf")
+    docs = loader.load()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    chunks = text_splitter.split_documents(docs)
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings)
+    return vectorstore.as_retriever()
 
-# 3. Display Chat History
-for msg in msgs.messages:
-    st.chat_message(msg.type).write(msg.content)
+retriever = initialize_retriever()
 
-# 4. Chat Input
-if prompt := st.chat_input("Type your nursing query here..."):
-    # Display user message
-    st.chat_message("human").write(prompt)
+@tool
+def search_nursing_protocols(query: str) -> str:
+    """Search the KKH Medical Emergencies PDF for clinical guidelines."""
+    docs = retriever.invoke(query)
+    return "\n\n".join([doc.page_content for doc in docs])
+
+@tool
+def calculate_fluid_requirement(weight_kg: float) -> str:
+    """Calculates daily fluid requirements (Holliday-Segar Formula)."""
+    if weight_kg <= 10: res = weight_kg * 100
+    elif weight_kg <= 20: res = 1000 + (weight_kg - 10) * 50
+    else: res = 1500 + (weight_kg - 20) * 20
+    return f"The calculated fluid requirement is {res} mL/day."
+
+tools = [calculate_fluid_requirement, search_nursing_protocols]
+
+# --- AGENT SETUP ---
+llm = ChatGoogleGenerativeAI(model="gemini-3-flash", temperature=0)
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are a KKH Clinical Nursing Assistant. Be precise and professional."),
+    ("placeholder", "{chat_history}"),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+# --- CHAT INTERFACE ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+if user_input := st.chat_input("How can I assist with clinical protocols today?"):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        response = agent_executor.invoke({
+            "input": user_input,
+            "chat_history": st.session_state.messages[:-1] 
+        })
+        full_response = response["output"]
+        st.markdown(full_response)
     
-    # Generate response using your existing agent_executor
-    with st.chat_message("ai"):
-        # The 'st_callback' shows the agent's "thinking" process (very cool for demos!)
-        # from langchain_community.callbacks import StreamlitCallbackHandler
-        # st_callback = StreamlitCallbackHandler(st.container())
-        
-        try:
-            # Add user message first
-            msgs.add_user_message(prompt)
-            
-            # Run your agent
-            response = agent_executor.invoke({"input": prompt})
-            output = response["output"]
-            
-            # Write and save the response
-            st.write(output)
-            msgs.add_ai_message(output)
-            
-        except Exception as e:
-            st.error(f"Error: {e}")
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
