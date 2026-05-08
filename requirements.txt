@@ -1,8 +1,7 @@
 streamlit
-langchain==0.1.16
-langchain-core==0.1.42
-langchain-community==0.0.32
-langchain-google-genai>=2.0.0
+langchain
+langchain-google-genai
+langchain-community
 langchain-chroma
-python-dotenv
 pypdf
+python-dotenv
