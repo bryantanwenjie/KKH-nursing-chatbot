@@ -107,27 +107,31 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
 
     with st.chat_message("assistant"):
         try:
+            # 1. Run the agent
             response = agent_executor.invoke({
                 "input": user_input,
                 "chat_history": st.session_state.messages[:-1] 
             })
             
-            raw_output = response["output"]
+            # 2. Grab the raw data
+            raw_output = response.get("output", "No response generated.")
             
-            # --- ROBUST TEXT EXTRACTION ---
+            # 3. THE CLEANER: Drill down to the actual text
+            # If it's a list: [{'type': 'text', 'text': '...', ...}]
             if isinstance(raw_output, list) and len(raw_output) > 0:
-                # Get the first item in the list
                 first_item = raw_output
-                # If the first item is a dictionary, grab 'text'
                 if isinstance(first_item, dict):
+                    # We only want the 'text' key, nothing else
                     full_response = first_item.get("text", str(first_item))
                 else:
                     full_response = str(first_item)
             else:
                 full_response = str(raw_output)
-            # ------------------------------
-                
+            
+            # 4. Display ONLY the clean text
             st.markdown(full_response)
+            
+            # 5. Save the clean text to history (not the messy JSON)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             
         except Exception as e:
