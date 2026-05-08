@@ -1,15 +1,35 @@
 import os
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
-
-# Now you can safely import Streamlit and the rest of your libraries
 import streamlit as st
+
+# --- DIAGNOSTIC X-RAY BLOCK ---
+try:
+    from langchain.agents import AgentExecutor, create_tool_calling_agent
+except ImportError as e:
+    st.error(f"🚨 IMPORT ERROR CAUGHT: {e}")
+    st.warning("Let's look at what Streamlit actually installed in the background:")
+    
+    import importlib.metadata
+    langchain_pkgs = {}
+    for dist in importlib.metadata.distributions():
+        if "langchain" in dist.metadata["Name"].lower():
+            langchain_pkgs[dist.metadata["Name"]] = dist.version
+            
+    st.json(langchain_pkgs)
+    st.stop() # Stops the app here so the rest of your code doesn't cause a crash
+# ------------------------------
+
+# If the import succeeds, the app will continue normally below
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
+
+st.success("✅ LangChain loaded successfully! The app is running.")
+
+# ... the rest of your app.py code ...
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="KKH Nursing Assistant", page_icon="🏥")
