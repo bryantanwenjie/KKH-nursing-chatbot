@@ -1,7 +1,8 @@
 streamlit
-langchain
+langchain>=0.3.0
 langchain-google-genai
 langchain-community
+langchain-core
 python-dotenv
 pypdf
 chromadb
