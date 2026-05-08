@@ -2,17 +2,17 @@ import os
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
 
-# The Direct Imports
-from langchain.agents.agent import AgentExecutor
-from langchain.agents.tool_calling_agent.base import create_tool_calling_agent
+# The Final Fix: Importing from the classic package
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
-# The rest of your normal imports
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
+
+# ... the rest of your app.py code ...
 
 # ... the rest of your UI and Agent logic ...
 
