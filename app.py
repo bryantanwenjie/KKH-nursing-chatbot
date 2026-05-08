@@ -18,6 +18,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
+from langchain_core.messages import HumanMessage
 
 st.success("✅ LangChain loaded successfully! The app is running.")
 
@@ -99,13 +100,13 @@ prompt = ChatPromptTemplate.from_messages([
     2. Do NOT use your general world knowledge to answer off-topic questions. 
     3. If refusing, gently remind the user that you are a clinical assistant and ask how you can help with medical protocols today."""),
     ("placeholder", "{chat_history}"),
-    ("human", "{input}"),
+    ("placeholder", "{input}"), # <--- CHANGED THIS TO PLACEHOLDER
     ("placeholder", "{agent_scratchpad}"),
 ])
 
 agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
+# Turn verbose to FALSE to prevent the server from freezing on images
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 
 # --- CHAT INTERFACE ---
 if "messages" not in st.session_state:
@@ -127,30 +128,31 @@ if user_input := st.chat_input("How can I assist with clinical protocols today?"
 
     with st.chat_message("assistant"):
         try:
-            # 1. Check if we have an image to send
+            # 1. Properly package the input
             if uploaded_image is not None:
-                # Convert the image to base64
                 img_bytes = uploaded_image.getvalue()
                 encoded_img = base64.b64encode(img_bytes).decode("utf-8")
                 image_data = f"data:image/jpeg;base64,{encoded_img}"
                 
-                # Create a "Multimodal" payload (Text + Image)
+                # Wrap it in a HumanMessage for LangChain
                 agent_input = [
-                    {"type": "text", "text": user_input},
-                    {"type": "image_url", "image_url": {"url": image_data}}
+                    HumanMessage(content=[
+                        {"type": "text", "text": user_input},
+                        {"type": "image_url", "image_url": {"url": image_data}}
+                    ])
                 ]
             else:
-                # If no image, just send the normal text
-                agent_input = user_input
+                agent_input = [HumanMessage(content=user_input)]
 
-            # 2. Run the agent with the new payload
+            # 2. Run the agent
             response = agent_executor.invoke({
                 "input": agent_input,
                 "chat_history": st.session_state.messages[:-1] 
             })
             
-            # 3. Clean the response (Using our Regex Laser from earlier)
+            # 3. Clean the response using our Regex Laser
             raw_output = str(response.get("output", ""))
+            import re
             match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
             
             if match:
