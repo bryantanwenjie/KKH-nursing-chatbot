@@ -3,6 +3,7 @@ langchain-core>=0.2.33
 langchain-community>=0.2.10
 langchain-google-genai>=1.0.8
 langchain-chroma>=0.1.2
+langchain-classic>=0.1.0
 streamlit>=1.38.0
 pypdf>=4.3.1
 python-dotenv>=1.0.1
