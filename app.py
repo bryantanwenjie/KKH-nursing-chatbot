@@ -45,7 +45,7 @@ def initialize_retriever():
 
         # 2. Explicitly pass the key into the embedding function
         embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
+            model="models/gemini-embedding-001", # <--- THE FIX IS HERE
             google_api_key=api_key
         )
         
