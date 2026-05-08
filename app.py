@@ -94,45 +94,44 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# ADD THIS: A button to clear history if it gets messy
+if st.button("Clear Chat History"):
+    st.session_state.messages = []
+    st.rerun()
+
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# ONLY ONE OF THESE SHOULD EXIST IN THE ENTIRE FILE
 if user_input := st.chat_input("How can I assist with clinical protocols today?"):
-    
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
         try:
-            # 1. Run the agent
             response = agent_executor.invoke({
                 "input": user_input,
                 "chat_history": st.session_state.messages[:-1] 
             })
             
-            # 2. Grab the raw data
-            raw_output = response.get("output", "No response generated.")
+            raw_output = response.get("output", "No response.")
             
-            # 3. THE CLEANER: Drill down to the actual text
-            # If it's a list: [{'type': 'text', 'text': '...', ...}]
+            # --- THE SUPER-CLEANER ---
+            # If it's the list format: [{'type': 'text', 'text': '...', ...}]
             if isinstance(raw_output, list) and len(raw_output) > 0:
-                first_item = raw_output
-                if isinstance(first_item, dict):
-                    # We only want the 'text' key, nothing else
-                    full_response = first_item.get("text", str(first_item))
+                item = raw_output
+                if isinstance(item, dict) and "text" in item:
+                    full_response = item["text"]
                 else:
-                    full_response = str(first_item)
+                    full_response = str(item)
             else:
                 full_response = str(raw_output)
-            
-            # 4. Display ONLY the clean text
+            # -------------------------
+
             st.markdown(full_response)
-            
-            # 5. Save the clean text to history (not the messy JSON)
+            # CRITICAL: Save ONLY the clean text to history
             st.session_state.messages.append({"role": "assistant", "content": full_response})
             
         except Exception as e:
-            st.error(f"🚨 Error: {str(e)}")
+            st.error(f"🚨 Google API Error: {str(e)}")
