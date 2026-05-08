@@ -1,13 +1,13 @@
 ﻿import os
 from dotenv import load_dotenv
 
-# Base LangChain & Google GenAI
+# 1. Base LangChain and Google GenAI
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 
-# Agent & Tooling (Correct 2026 Paths)
+# 2. Agent and Tooling (Modern 2026 Paths)
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.tools import tool
 from langchain_core.prompts import ChatPromptTemplate
