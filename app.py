@@ -271,74 +271,157 @@ if not st.session_state.app_started:
         # Make sure nurse.png is uploaded to your GitHub!
         st.image("nurse.png", use_container_width=True)
 
-# --- VIEW 2: CHAT INTERFACE ---
+# --- VIEW 2: NOTEBOOKLM-STYLE CHAT INTERFACE ---
 else:
-    # Sidebar
+    # 1. THE LEFT PANE (Sidebar Navigation & Mode Selection)
     with st.sidebar:
         if st.button("⬅ Back to Home"):
             st.session_state.app_started = False
             st.rerun()
             
         st.divider()
-        st.header("📷 Clinical Vision")
-        uploaded_image = st.file_uploader("Upload monitor, chart, or clinical image", type=["png", "jpg", "jpeg"])
         
-        if uploaded_image:
-            st.image(uploaded_image, caption="Image ready for analysis", use_container_width=True)
+        # --- THE TEAM'S MODE SELECTOR ---
+        st.header("⚙️ Assistant Mode")
+        app_mode = st.selectbox(
+            "Select AI Capability:",
+            ["Clinical Vision (Image)", "Video Analysis", "Speech-to-Text", "Clinical Quiz"]
+        )
+        
+        st.divider()
+        
+        # --- CONDITIONAL UPLOADERS BASED ON MODE ---
+        if app_mode == "Clinical Vision (Image)":
+            st.subheader("📷 Clinical Vision")
+            uploaded_file = st.file_uploader("Upload monitor, chart, or clinical image", type=["png", "jpg", "jpeg"])
+            if uploaded_file:
+                st.image(uploaded_file, caption="Ready for analysis", use_container_width=True)
+                
+        elif app_mode == "Video Analysis":
+            st.subheader("🎥 Video Analysis")
+            uploaded_file = st.file_uploader("Upload clinical procedure video", type=["mp4", "mov"])
+            if uploaded_file:
+                st.success("Video uploaded successfully!")
+                
+        elif app_mode == "Speech-to-Text":
+            st.subheader("🎙️ Audio Dictation")
+            uploaded_file = st.file_uploader("Upload physician audio notes", type=["wav", "mp3"])
+            
+        elif app_mode == "Clinical Quiz":
+            st.subheader("📝 Quiz Parameters")
+            st.slider("Number of Questions", 1, 10, 5)
+            st.selectbox("Difficulty", ["Beginner Nursing", "Advanced Clinical", "Specialist"])
 
-    # Main Chat Area
-    st.markdown(f"<h1 style='color: {text_main};'>🏥 NursBot Clinical Assistant</h1>", unsafe_allow_html=True)
+    # --- MAIN LAYOUT SETUP (NotebookLM Style) ---
+    # We split the screen: 70% for Chat, 30% for the "Studio" Tools
+    chat_col, studio_col = st.columns([2.5, 1], gap="large")
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    # 2. THE CENTER PANE (Chat Interface)
+    with chat_col:
+        st.markdown(f"<h2 style='color: {text_main};'>🏥 NursBot - {app_mode}</h2>", unsafe_allow_html=True)
 
-    if st.button("Clear Chat History"):
-        st.session_state.messages = []
-        st.rerun()
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    if user_input := st.chat_input("How can I assist with clinical protocols today?"):
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
+        # The Chat Input
+        if user_input := st.chat_input(f"Ask a question using {app_mode}..."):
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            with st.chat_message("user"):
+                st.markdown(user_input)
 
-        with st.chat_message("assistant"):
-            try:
-                # Package the input with image if available
-                if uploaded_image is not None:
-                    img_bytes = uploaded_image.getvalue()
-                    encoded_img = base64.b64encode(img_bytes).decode("utf-8")
-                    image_data = f"data:image/jpeg;base64,{encoded_img}"
+            with st.chat_message("assistant"):
+                try:
+                    # --- TEAM ROUTING LOGIC ---
                     
-                    agent_input = [
-                        HumanMessage(content=[
-                            {"type": "text", "text": user_input},
-                            {"type": "image_url", "image_url": {"url": image_data}}
-                        ])
-                    ]
-                else:
-                    agent_input = [HumanMessage(content=user_input)]
+                    # MEMBER 1: YOUR VISION CODE
+                    if app_mode == "Clinical Vision (Image)":
+                        if uploaded_file is not None:
+                            img_bytes = uploaded_file.getvalue()
+                            encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                            image_data = f"data:image/jpeg;base64,{encoded_img}"
+                            
+                            agent_input = [
+                                HumanMessage(content=[
+                                    {"type": "text", "text": user_input},
+                                    {"type": "image_url", "image_url": {"url": image_data}}
+                                ])
+                            ]
+                        else:
+                            agent_input = [HumanMessage(content=user_input)]
 
-                # Run the agent
-                response = agent_executor.invoke({
-                    "input": agent_input,
-                    "chat_history": st.session_state.messages[:-1] 
-                })
-                
-                # Clean the response output
-                raw_output = str(response.get("output", ""))
-                match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
-                
-                if match:
-                    full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'")
-                else:
-                    full_response = raw_output
+                        # Run your specific agent
+                        response = agent_executor.invoke({
+                            "input": agent_input,
+                            "chat_history": st.session_state.messages[:-1] 
+                        })
+                        
+                        raw_output = str(response.get("output", ""))
+                        match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
+                        full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
+                        
+                        st.markdown(full_response)
+                        st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-                st.markdown(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
-            except Exception as e:
-                st.error(f"🚨 Error: {str(e)}")
+                    # MEMBER 2: VIDEO CODE
+                    elif app_mode == "Video Analysis":
+                        placeholder_response = "*(Teammate's Video API logic will process this prompt)*"
+                        st.markdown(placeholder_response)
+                        st.session_state.messages.append({"role": "assistant", "content": placeholder_response})
+                        
+                    # MEMBER 3: SPEECH CODE
+                    elif app_mode == "Speech-to-Text":
+                        placeholder_response = "*(Teammate's Whisper/Speech API logic will process this prompt)*"
+                        st.markdown(placeholder_response)
+                        st.session_state.messages.append({"role": "assistant", "content": placeholder_response})
+
+                    # MEMBER 4: QUIZ CODE
+                    elif app_mode == "Clinical Quiz":
+                        placeholder_response = "*(Teammate's Quiz Generation logic will process this prompt)*"
+                        st.markdown(placeholder_response)
+                        st.session_state.messages.append({"role": "assistant", "content": placeholder_response})
+
+                except Exception as e:
+                    st.error(f"🚨 Error: {str(e)}")
+
+    # 3. THE RIGHT PANE (NotebookLM Studio)
+    with studio_col:
+        st.markdown(f"<h3 style='color: {text_main};'>Studio</h3>", unsafe_allow_html=True)
+        
+        # We use custom HTML/CSS to make these look like NotebookLM's clickable cards
+        st.markdown(f"""
+        <style>
+        .studio-card {{
+            background-color: {bg_color};
+            border: 1px solid {divider_color};
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: {text_main};
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        .studio-card:hover {{
+            border-color: #1A73E8;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Clear Chat Button (Moved here for better UX)
+        if st.button("🗑️ Clear Chat History", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+            
+        st.write("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="studio-card">🎙️ <b>Audio Overview</b><br><span style="font-size:12px; color:gray;">Generate podcast</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="studio-card">📝 <b>Generate Quiz</b><br><span style="font-size:12px; color:gray;">Test your knowledge</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="studio-card">📊 <b>Data Table</b><br><span style="font-size:12px; color:gray;">Extract clinical stats</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="studio-card">🎥 <b>Video Summary</b><br><span style="font-size:12px; color:gray;">Analyze procedure</span></div>', unsafe_allow_html=True)
