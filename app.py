@@ -83,22 +83,66 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 # =========== FRONTEND UI ==================
 # ==========================================
 
-# Custom CSS to match the Base44 Design
-st.markdown("""
+# --- STATE MANAGEMENT ---
+if "app_started" not in st.session_state:
+    st.session_state.app_started = False
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+def toggle_theme():
+    st.session_state.dark_mode = not st.session_state.dark_mode
+
+# --- DYNAMIC THEME COLORS ---
+if st.session_state.dark_mode:
+    bg_color = "radial-gradient(circle at top left, #1F2937, #111827)"
+    text_main = "#F9FAFB"
+    text_sub = "#9CA3AF"
+    nav_color = "#D1D5DB"
+else:
+    # Exact background match to the Base44 image
+    bg_color = "radial-gradient(circle at top left, #FFFFFF, #F0F4F8)"
+    text_main = "#1F2937"
+    text_sub = "#4B5563"
+    nav_color = "#4B5563"
+
+# --- CUSTOM CSS ---
+st.markdown(f"""
 <style>
+    /* Apply Background Color to the entire Streamlit App */
+    [data-testid="stAppViewContainer"] {{
+        background: {bg_color};
+    }}
+    
+    /* Hide the default Streamlit top header line */
+    [data-testid="stHeader"] {{
+        background: transparent;
+    }}
+
     /* Override Streamlit's default red button to Base44 Blue */
-    div[data-testid="stButton"] button[kind="primary"] {
+    div[data-testid="stButton"] button[kind="primary"] {{
         background-color: #1A73E8 !important;
         border-color: #1A73E8 !important;
         color: white !important;
         border-radius: 8px !important;
-    }
-    div[data-testid="stButton"] button[kind="primary"]:hover {
+    }}
+    div[data-testid="stButton"] button[kind="primary"]:hover {{
         background-color: #1557B0 !important;
         border-color: #1557B0 !important;
-    }
+    }}
     
-    .badge {
+    /* Navbar styling */
+    .nav-links {{
+        display: flex; 
+        justify-content: center; 
+        gap: 30px; 
+        font-size: 14px; 
+        font-weight: 600; 
+        color: {nav_color};
+        margin-top: 10px;
+    }}
+    
+    /* Hero typography */
+    .badge {{
         background-color: #E8F0FE;
         color: #1A73E8;
         padding: 6px 16px;
@@ -108,43 +152,61 @@ st.markdown("""
         display: inline-block;
         margin-bottom: 1rem;
         border: 1px solid #D2E3FC;
-    }
-    .hero-title {
-        font-size: 3.5rem;
+    }}
+    .hero-title {{
+        font-size: 3.8rem;
         font-weight: 800;
         line-height: 1.1;
         margin-bottom: 1.5rem;
-        color: #1f2937;
-    }
-    .hero-title span {
+        color: {text_main};
+    }}
+    .hero-title span {{
         color: #0d9488; /* Teal color for AI */
-    }
-    .hero-subtitle {
+    }}
+    .hero-subtitle {{
         font-size: 1.2rem;
-        color: #4b5563;
+        color: {text_sub};
         margin-bottom: 2rem;
         line-height: 1.6;
-    }
-    .stat-number {
+    }}
+    .stat-number {{
         font-size: 1.8rem;
         font-weight: 800;
-        color: #111827;
+        color: {text_main};
         margin-bottom: -5px;
-    }
-    .stat-label {
+    }}
+    .stat-label {{
         font-size: 0.9rem;
-        color: #6b7280;
-    }
+        color: {text_sub};
+    }}
 </style>
 """, unsafe_allow_html=True)
 
-if "app_started" not in st.session_state:
-    st.session_state.app_started = False
 
 # --- VIEW 1: LANDING PAGE ---
 if not st.session_state.app_started:
+    
+    # 1. TOP NAVBAR
+    nav1, nav2, nav3, nav4 = st.columns([1.5, 4, 0.5, 1], gap="small")
+    
+    with nav1:
+        st.markdown(f"<h3 style='margin-top: -5px; color: {text_main};'>🩺 NursBot</h3>", unsafe_allow_html=True)
+    with nav2:
+        st.markdown('<div class="nav-links"><span>Features</span><span>How It Works</span><span>Benefits</span><span>Demo</span><span>About</span></div>', unsafe_allow_html=True)
+    with nav3:
+        # The Moon/Sun Toggle Button
+        icon = "☀️" if st.session_state.dark_mode else "🌙"
+        st.button(icon, on_click=toggle_theme, key="theme_btn")
+    with nav4:
+        # Get Started Button
+        if st.button("Get Started", type="primary", use_container_width=True):
+            st.session_state.app_started = True
+            st.rerun()
+            
+    st.divider() # Creates a clean line under the navbar
     st.write("<br><br>", unsafe_allow_html=True)
     
+    # 2. HERO SECTION
     col1, col2 = st.columns([1.2, 1], gap="large")
     
     with col1:
@@ -152,16 +214,18 @@ if not st.session_state.app_started:
         st.markdown('<div class="hero-title">Smarter Nursing<br>with <span>AI</span> Support</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-subtitle">A smart chatbot designed for nurses — access clinical protocols, perform medical calculations, and learn on the go. All in one place, available 24/7.</div>', unsafe_allow_html=True)
         
-        btn_col1, btn_col2 = st.columns(2)
+        # Buttons sized to match the image
+        btn_col1, btn_col2, _ = st.columns([1, 1, 1.5]) 
         with btn_col1:
-            if st.button("Try Chatbot ➔", type="primary", use_container_width=True):
+            if st.button("Try Chatbot ➔", type="primary", use_container_width=True, key="try_btn"):
                 st.session_state.app_started = True
                 st.rerun()
         with btn_col2:
-            st.button("Learn More")
+            st.button("Learn More", use_container_width=True)
             
         st.write("<br><br>", unsafe_allow_html=True)
         
+        # Stats section
         stat1, stat2, stat3 = st.columns(3)
         with stat1:
             st.markdown('<div class="stat-number">24/7</div><div class="stat-label">Available</div>', unsafe_allow_html=True)
@@ -171,7 +235,7 @@ if not st.session_state.app_started:
             st.markdown('<div class="stat-number">98%</div><div class="stat-label">Accuracy</div>', unsafe_allow_html=True)
 
     with col2:
-        # We use a placeholder image; replace with your own asset
+        # Make sure nurse.png is uploaded to your GitHub!
         st.image("nurse.png", use_container_width=True)
 
 # --- VIEW 2: CHAT INTERFACE ---
