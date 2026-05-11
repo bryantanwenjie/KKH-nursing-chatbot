@@ -94,9 +94,9 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 if "app_started" not in st.session_state:
     st.session_state.app_started = False
 if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
+    st.session_state.dark_mode = True # Defaulting to Dark Mode like Gemini
 if "studio_expanded" not in st.session_state:
-    st.session_state.studio_expanded = True
+    st.session_state.studio_expanded = False # Studio closed by default for wider chat
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -105,76 +105,52 @@ def toggle_theme():
 
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    bg_color = "radial-gradient(circle at top left, #1F2937, #111827)"
-    text_main = "#F9FAFB"
-    text_sub = "#9CA3AF"
-    nav_color = "#D1D5DB"
-    divider_color = "#374151"
-    sidebar_bg = "transparent"
+    bg_color = "#131314" # Exact Gemini Dark Gray
+    text_main = "#E3E3E3"
+    text_sub = "#C4C7C5"
+    nav_color = "#E3E3E3"
+    divider_color = "#444746"
 else:
-    bg_color = "radial-gradient(circle at top left, #FFFFFF, #F0F4F8)"
+    bg_color = "#FFFFFF"
     text_main = "#1F2937"
     text_sub = "#4B5563"
     nav_color = "#4B5563"
     divider_color = "#E5E7EB"
-    sidebar_bg = "transparent"
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
     /* Apply Background Color */
-    [data-testid="stAppViewContainer"] {{
-        background: {bg_color};
-    }}
-    [data-testid="stHeader"] {{
-        background: transparent;
-    }}
+    [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
+    [data-testid="stHeader"] {{ background: transparent; }}
+    
     /* Blue Primary Buttons */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #1A73E8 !important;
-        border-color: #1A73E8 !important;
-        color: white !important;
-        border-radius: 8px !important;
+        background-color: #1A73E8 !important; border-color: #1A73E8 !important; color: white !important; border-radius: 8px !important;
     }}
-    div[data-testid="stButton"] button[kind="primary"]:hover {{
-        background-color: #1557B0 !important;
-        border-color: #1557B0 !important;
+    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; }}
+    
+    /* Sidebar History Button Styling */
+    .history-btn {{
+        width: 100%; text-align: left; background: none; border: none; color: {text_sub};
+        padding: 8px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-bottom: 5px;
     }}
-    /* Typography & Layout for Landing Page */
+    .history-btn:hover {{ background: rgba(255,255,255,0.1); color: {text_main}; }}
+    
+    /* Typography */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
     .badge {{ background-color: #E8F0FE; color: #1A73E8; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 1rem; border: 1px solid #D2E3FC; }}
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
     .hero-title span {{ color: #0d9488; }}
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
-    .stats-container {{ display: flex; align-items: center; gap: 2rem; margin-top: 1rem; }}
-    .stat-box {{ display: flex; flex-direction: column; }}
-    .stat-divider {{ height: 45px; width: 2px; background-color: {divider_color}; }}
-    .stat-number {{ font-size: 1.8rem; font-weight: 800; color: {text_main}; margin-bottom: -5px; }}
-    .stat-label {{ font-size: 0.9rem; color: {text_sub}; }}
     
     /* Studio Cards */
     .studio-card {{
-        background-color: {bg_color};
-        border: 1px solid {divider_color};
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 12px;
-        cursor: pointer;
-        transition: 0.2s;
-        color: {text_main};
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+        background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px;
+        padding: 15px; margin-bottom: 12px; cursor: pointer; transition: 0.2s;
+        color: {text_main}; font-weight: 500; display: flex; align-items: center; gap: 10px;
     }}
-    .studio-card:hover {{ border-color: #1A73E8; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }}
-    
-    /* Clean up history buttons */
-    .history-btn {{
-        width: 100%; text-align: left; background: none; border: none; color: {text_sub};
-        padding: 8px; border-radius: 6px; cursor: pointer; font-size: 14px;
-    }}
-    .history-btn:hover {{ background: rgba(0,0,0,0.05); }}
+    .studio-card:hover {{ border-color: #1A73E8; background: rgba(255,255,255,0.05); }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -199,126 +175,114 @@ if not st.session_state.app_started:
     with col1:
         st.markdown('<div class="badge">✨ AI-POWERED CLINICAL ASSISTANT</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-title">Smarter Nursing<br>with <span>AI</span> Support</div>', unsafe_allow_html=True)
-        st.markdown('<div class="hero-subtitle">A smart chatbot designed for nurses — access clinical protocols, perform medical calculations, and learn on the go. All in one place, available 24/7.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="hero-subtitle">A smart chatbot designed for nurses — access clinical protocols, perform medical calculations, and learn on the go.</div>', unsafe_allow_html=True)
         btn_col1, btn_col2, _ = st.columns([1, 1, 1.5]) 
         with btn_col1:
             if st.button("Try Chatbot ➔", type="primary", use_container_width=True, key="try_btn"):
                 st.session_state.app_started = True
                 st.rerun()
         with btn_col2: st.button("Learn More", use_container_width=True)
-        st.write("<br><br>", unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="stats-container">
-            <div class="stat-box"><div class="stat-number">24/7</div><div class="stat-label">Available</div></div><div class="stat-divider"></div>
-            <div class="stat-box"><div class="stat-number">500+</div><div class="stat-label">Protocols</div></div><div class="stat-divider"></div>
-            <div class="stat-box"><div class="stat-number">98%</div><div class="stat-label">Accuracy</div></div>
-        </div>
-        """, unsafe_allow_html=True)
 
     with col2:
         st.image("nurse.png", use_container_width=True)
 
 
-# --- VIEW 2: NOTEBOOKLM / CHATGPT STYLE APP ---
+# --- VIEW 2: GEMINI / CHATGPT STYLE APP ---
 else:
-    # 1. LEFT PANE: ChatGPT-Style Sidebar
+    # 1. LEFT PANE: Gemini-Style Sidebar History
     with st.sidebar:
-        if st.button("⬅ Back to Home"):
-            st.session_state.app_started = False
-            st.rerun()
-            
-        st.write("<br>", unsafe_allow_html=True)
-        
-        # New Chat Button
-        if st.button("➕ New Chat", type="primary", use_container_width=True):
+        # Top Menu Items
+        st.markdown(f"<h3 style='color:{text_main};'>🩺 NursBot</h3>", unsafe_allow_html=True)
+        if st.button("📝 New chat", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
             
-        st.divider()
-        
-        # Mock Chat History
-        st.markdown(f"<p style='color:{text_sub}; font-size:12px; font-weight:bold;'>TODAY</p>", unsafe_allow_html=True)
-        st.button("💬 Fluid Requirement Calc", use_container_width=True, key="hist1")
-        st.button("💬 Medical Emergencies...", use_container_width=True, key="hist2")
-        
         st.write("<br>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color:{text_sub}; font-size:12px; font-weight:bold;'>YESTERDAY</p>", unsafe_allow_html=True)
-        st.button("💬 Image Analysis - ECG", use_container_width=True, key="hist3")
-        st.button("💬 Quiz: Ward Protocols", use_container_width=True, key="hist4")
+        
+        # Recent Chats Section
+        st.markdown(f"<p style='color:{text_sub}; font-size:14px; font-weight:600;'>Recent</p>", unsafe_allow_html=True)
+        
+        # Using custom HTML for sleek, borderless history buttons
+        st.markdown(f"""
+            <button class="history-btn">💬 Fluid Requirement Calc...</button>
+            <button class="history-btn">💬 Deep Research Session...</button>
+            <button class="history-btn">💬 Image Analysis - ECG...</button>
+            <button class="history-btn">💬 Streamlit Deployment Fixes...</button>
+            <button class="history-btn">💬 Quiz: Ward Protocols...</button>
+        """, unsafe_allow_html=True)
+        
+        st.divider()
+        if st.button("⬅ Back to Home", use_container_width=True):
+            st.session_state.app_started = False
+            st.rerun()
 
     # 2. MAIN LAYOUT TOGGLE
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns([2.5, 1], gap="large")
+        chat_col, studio_col = st.columns(, gap="large")
     else:
         chat_col = st.container()
 
     # 3. CENTER PANE: Chat & Input
     with chat_col:
-        # Header Row: Title + Toggle Studio Button
-        head_title, head_btn = st.columns([4, 1.2])
-        with head_title:
-            st.markdown(f"<h2 style='color: {text_main};'>🏥 NursBot</h2>", unsafe_allow_html=True)
+        # Header Row: Toggle Studio Button
+        _, head_btn = st.columns()
         with head_btn:
-            st.write("<br>", unsafe_allow_html=True)
-            toggle_label = "➡️ Hide Studio" if st.session_state.studio_expanded else "⬅️ Show Studio"
+            toggle_label = "✖ Close Studio" if st.session_state.studio_expanded else "⚡ Open Studio"
             if st.button(toggle_label, use_container_width=True):
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
 
-        # Render Chat Messages
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        # ChatGPT-Style Attachment/Mode Selector (Lives right above the text input)
-        st.write("<br>", unsafe_allow_html=True)
-        with st.expander("📎 Attachments & AI Mode", expanded=False):
-            app_mode = st.selectbox(
-                "Select AI Capability:",
-                ["Clinical Vision (Image)", "Video Analysis", "Speech-to-Text", "Clinical Quiz"]
-            )
+        # Render Chat Messages inside a container
+        chat_container = st.container(height=550, border=False)
+        with chat_container:
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
             
-            uploaded_file = None
-            if app_mode == "Clinical Vision (Image)":
-                uploaded_file = st.file_uploader("Upload monitor, chart, or clinical image", type=["png", "jpg", "jpeg"])
-            elif app_mode == "Video Analysis":
-                uploaded_file = st.file_uploader("Upload clinical procedure video", type=["mp4", "mov"])
-            elif app_mode == "Speech-to-Text":
-                uploaded_file = st.file_uploader("Upload physician audio notes", type=["wav", "mp3"])
-            elif app_mode == "Clinical Quiz":
-                st.slider("Number of Questions", 1, 10, 5)
-                st.selectbox("Difficulty", ["Beginner Nursing", "Advanced Clinical", "Specialist"])
+            if len(st.session_state.messages) == 0:
+                st.markdown(f"<h1 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h1>", unsafe_allow_html=True)
 
-        # The Chat Input
+        # THE GEMINI-STYLE TOOLS & ATTACHMENT POPOVER
+        # This sits perfectly above the text input
+        uploaded_file = None
+        app_mode = "Clinical Vision (Image)" # Default
+        
+        with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
+            app_mode = st.selectbox("Select AI Capability:", ["Clinical Vision (Image)", "Video Analysis", "Speech-to-Text", "Clinical Quiz"])
+            
+            if app_mode == "Clinical Vision (Image)":
+                uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
+            elif app_mode == "Video Analysis":
+                uploaded_file = st.file_uploader("Upload video", type=["mp4", "mov"])
+            elif app_mode == "Speech-to-Text":
+                uploaded_file = st.file_uploader("Upload audio", type=["wav", "mp3"])
+            elif app_mode == "Clinical Quiz":
+                st.slider("Questions", 1, 10, 5)
+                st.selectbox("Difficulty", ["Beginner", "Advanced", "Specialist"])
+
+        # The Chat Input (Sticky at the bottom)
         if user_input := st.chat_input(f"Message NursBot ({app_mode})..."):
             st.session_state.messages.append({"role": "user", "content": user_input})
-            with st.chat_message("user"):
-                st.markdown(user_input)
+            st.rerun() # Force rerun to display user message instantly
 
+    # Run AI Logic outside the input block to maintain UI state
+    if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user":
+        latest_user_input = st.session_state.messages[-1]["content"]
+        with chat_container:
             with st.chat_message("assistant"):
                 try:
                     # --- TEAM ROUTING LOGIC ---
-                    
-                    # MEMBER 1: YOUR VISION CODE
                     if app_mode == "Clinical Vision (Image)":
                         if uploaded_file is not None:
                             img_bytes = uploaded_file.getvalue()
                             encoded_img = base64.b64encode(img_bytes).decode("utf-8")
                             image_data = f"data:image/jpeg;base64,{encoded_img}"
-                            
-                            agent_input = [
-                                HumanMessage(content=[
-                                    {"type": "text", "text": user_input},
-                                    {"type": "image_url", "image_url": {"url": image_data}}
-                                ])
-                            ]
+                            agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
                         else:
-                            agent_input = [HumanMessage(content=user_input)]
+                            agent_input = [HumanMessage(content=latest_user_input)]
 
-                        response = agent_executor.invoke({
-                            "input": agent_input,
-                            "chat_history": st.session_state.messages[:-1] 
-                        })
+                        with st.spinner("Analyzing clinical data..."):
+                            response = agent_executor.invoke({"input": agent_input, "chat_history": st.session_state.messages[:-1]})
                         
                         raw_output = str(response.get("output", ""))
                         match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
@@ -326,32 +290,31 @@ else:
                         
                         st.markdown(full_response)
                         st.session_state.messages.append({"role": "assistant", "content": full_response})
+                        st.rerun()
 
-                    # MEMBER 2: VIDEO CODE
                     elif app_mode == "Video Analysis":
-                        placeholder_response = "*(Teammate's Video API logic will process this prompt)*"
-                        st.markdown(placeholder_response)
-                        st.session_state.messages.append({"role": "assistant", "content": placeholder_response})
+                        st.markdown("*(Teammate's Video API logic will process this prompt)*")
+                        st.session_state.messages.append({"role": "assistant", "content": "*(Teammate's Video API logic will process this prompt)*"})
+                        st.rerun()
                         
-                    # MEMBER 3: SPEECH CODE
                     elif app_mode == "Speech-to-Text":
-                        placeholder_response = "*(Teammate's Whisper/Speech API logic will process this prompt)*"
-                        st.markdown(placeholder_response)
-                        st.session_state.messages.append({"role": "assistant", "content": placeholder_response})
+                        st.markdown("*(Teammate's Speech API logic will process this prompt)*")
+                        st.session_state.messages.append({"role": "assistant", "content": "*(Teammate's Speech API logic will process this prompt)*"})
+                        st.rerun()
 
-                    # MEMBER 4: QUIZ CODE
                     elif app_mode == "Clinical Quiz":
-                        placeholder_response = "*(Teammate's Quiz Generation logic will process this prompt)*"
-                        st.markdown(placeholder_response)
-                        st.session_state.messages.append({"role": "assistant", "content": placeholder_response})
+                        st.markdown("*(Teammate's Quiz logic will process this prompt)*")
+                        st.session_state.messages.append({"role": "assistant", "content": "*(Teammate's Quiz logic will process this prompt)*"})
+                        st.rerun()
 
                 except Exception as e:
                     st.error(f"🚨 Error: {str(e)}")
 
+
     # 4. RIGHT PANE: Studio (Only renders if expanded)
     if st.session_state.studio_expanded:
         with studio_col:
-            st.markdown(f"<h3 style='color: {text_main};'>Studio</h3>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='color: {text_main}; margin-top:0px;'>Studio</h3>", unsafe_allow_html=True)
             st.write("<br>", unsafe_allow_html=True)
             
             st.markdown('<div class="studio-card">🎙️ <b>Audio Overview</b><br><span style="font-size:12px; color:gray;">Generate podcast</span></div>', unsafe_allow_html=True)
