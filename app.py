@@ -172,7 +172,7 @@ if not st.session_state.app_started:
 
     with col2:
         # We use a placeholder image; replace with your own asset
-        st.image("https://img.freepik.com/free-vector/doctor-nurse-concept-illustration_114360-15555.jpg", use_container_width=True)
+        st.image("nurse.png", use_container_width=True)
 
 # --- VIEW 2: CHAT INTERFACE ---
 else:
