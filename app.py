@@ -150,7 +150,7 @@ if not st.session_state.app_started:
         st.markdown('<div class="hero-title">Smarter Nursing<br>with <span>AI</span> Support</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-subtitle">A smart chatbot designed for nurses — access clinical protocols, perform medical calculations, and learn on the go. All in one place, available 24/7.</div>', unsafe_allow_html=True)
         
-        btn_col1, btn_col2 = st.columns()
+        btn_col1, btn_col2 = st.columns(2)
         with btn_col1:
             if st.button("Try Chatbot ➔", type="primary", use_container_width=True):
                 st.session_state.app_started = True
