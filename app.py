@@ -1,7 +1,14 @@
 import base64
 import os
-import time
+import re
+os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
+
+# --- THE MEMORY NUKE ---
+if "nuke_complete" not in st.session_state:
+    st.session_state.clear()
+    st.session_state.nuke_complete = True
+# -----------------------
 
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -21,26 +28,21 @@ if "GOOGLE_API_KEY" in st.secrets:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
 # ==========================================
-# ======= BACKEND & RAG (OPTIMIZED) ========
+# ======= BACKEND (DO NOT TOUCH) ===========
 # ==========================================
 @st.cache_resource(show_spinner=False)
 def initialize_retriever():
     try:
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-        db_path = "./kkh_chroma_db"
-        
-        # FEATURE 2: Persistent Chroma DB
-        if os.path.exists(db_path):
-            vectorstore = Chroma(persist_directory=db_path, embedding_function=embeddings)
-        else:
-            with st.spinner("Initializing Vector Database for the first time..."):
-                loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf")
-                docs = loader.load()
-                text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-                chunks = text_splitter.split_documents(docs)
-                vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings, persist_directory=db_path)
-                
-        return vectorstore.as_retriever()
+        with st.spinner("Building unlimited Vector Database with Hugging Face..."):
+            loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf")
+            docs = loader.load()
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+            chunks = text_splitter.split_documents(docs)
+
+            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+            vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings)
+            
+            return vectorstore.as_retriever()
     
     except Exception as e:
         st.error(f"🚨 Vector DB Error: {str(e)}")
@@ -68,8 +70,13 @@ llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a strictly professional KKH Clinical Nursing Assistant. 
+    
     Your ONLY purpose is to answer questions related to clinical protocols, nursing guidelines, and medical topics based on the provided KKH documents. 
-    If refusing an off-topic request, gently remind the user that you are a clinical assistant."""),
+    
+    CRITICAL RULES:
+    1. If a user asks a question unrelated to healthcare, nursing, or KKH (e.g., recipes, general technology, movies, casual chat), you MUST politely refuse to answer. 
+    2. Do NOT use your general world knowledge to answer off-topic questions. 
+    3. If refusing, gently remind the user that you are a clinical assistant and ask how you can help with medical protocols today."""),
     ("placeholder", "{chat_history}"),
     ("placeholder", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
@@ -78,23 +85,20 @@ prompt = ChatPromptTemplate.from_messages([
 agent = create_tool_calling_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 
-# FEATURE 1: Streaming Generator Function
-def stream_text(text, speed=0.015):
-    for word in text.split(" "):
-        yield word + " "
-        time.sleep(speed)
 
 # ==========================================
 # =========== FRONTEND UI ==================
 # ==========================================
 
-# SAFE STATE INITIALIZATION (No more nuking)
+# --- STATE MANAGEMENT ---
 if "app_started" not in st.session_state:
     st.session_state.app_started = False
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = True 
 if "studio_expanded" not in st.session_state:
     st.session_state.studio_expanded = False 
+
+# --- REAL CHAT HISTORY SYSTEM ---
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = {"New Chat": []}
 if "current_chat" not in st.session_state:
@@ -106,59 +110,66 @@ def toggle_theme():
     st.session_state.dark_mode = not st.session_state.dark_mode
 
 def get_chat_title(chat_id, messages):
-    if not messages: return chat_id
+    if not messages:
+        return chat_id
     for m in messages:
-        if m["role"] == "user": return m["content"][:20] + "..."
+        if m["role"] == "user":
+            return m["content"][:20] + "..."
     return chat_id
 
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    bg_color, text_main, text_sub, divider_color = "#131314", "#E3E3E3", "#C4C7C5", "#444746"
+    bg_color = "#131314" 
+    text_main = "#E3E3E3"
+    text_sub = "#C4C7C5"
+    nav_color = "#E3E3E3"
+    divider_color = "#444746"
     card_hover = "rgba(255,255,255,0.08)"
-    user_bubble, bot_bubble = "#1E1E1E", "rgba(26, 115, 232, 0.08)"
 else:
-    bg_color, text_main, text_sub, divider_color = "#FFFFFF", "#1F2937", "#4B5563", "#E5E7EB"
-    card_hover = "rgba(26, 115, 232, 0.05)"
-    user_bubble, bot_bubble = "#F3F4F6", "rgba(26, 115, 232, 0.05)"
+    bg_color = "#FFFFFF"
+    text_main = "#1F2937"
+    text_sub = "#4B5563"
+    nav_color = "#4B5563"
+    divider_color = "#E5E7EB"
+    card_hover = "rgba(26, 115, 232, 0.05)" # Subtle blue tint on light mode
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
-    /* Backgrounds */
+    /* Apply Background Color */
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
-    /* FEATURE 4 & 5: CSS Transitions & Bubble Styling */
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
-        transition: width 0.4s ease-in-out, opacity 0.4s ease-in-out !important;
-    }}
-    
-    [data-testid="stChatMessage"][data-testid*="user"] {{
-        background-color: {user_bubble}; border-radius: 12px; padding: 10px 15px; border: 1px solid {divider_color};
-    }}
-    [data-testid="stChatMessage"][data-testid*="assistant"] {{
-        background-color: {bot_bubble}; border-radius: 12px; padding: 10px 15px; border: 1px solid rgba(26, 115, 232, 0.15);
-    }}
-    
     /* Blue Primary Buttons */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #1A73E8 !important; border-color: #1A73E8 !important; color: white !important; border-radius: 8px !important; transition: all 0.2s ease;
+        background-color: #1A73E8 !important; border-color: #1A73E8 !important; color: white !important; border-radius: 8px !important;
+        font-weight: 600; transition: all 0.2s ease;
     }}
     div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; transform: translateY(-1px); }}
     
-    /* Typography & Utilities */
+    /* Sidebar History Button Styling */
     .stButton > button {{ text-align: left !important; transition: all 0.2s ease; }}
-    .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {text_main}; margin-top: 10px; }}
+    
+    /* Typography */
+    .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
     .badge {{ background-color: #E8F0FE; color: #1A73E8; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 1rem; border: 1px solid #D2E3FC; }}
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
     .hero-title span {{ color: #0d9488; }}
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
+    /* Smoother Studio Cards */
     .studio-card {{
-        background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; margin-bottom: 12px; cursor: pointer; 
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); color: {text_main}; font-weight: 500; display: flex; align-items: center; gap: 10px;
+        background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px;
+        padding: 15px; margin-bottom: 12px; cursor: pointer; 
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Buttery smooth animation */
+        color: {text_main}; font-weight: 500; display: flex; align-items: center; gap: 10px;
     }}
-    .studio-card:hover {{ border-color: #1A73E8; background: {card_hover}; transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }}
+    .studio-card:hover {{ 
+        border-color: #1A73E8; 
+        background: {card_hover}; 
+        transform: translateY(-3px); /* Lifts the card up slightly */
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1); 
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -168,7 +179,9 @@ if not st.session_state.app_started:
     nav1, nav2, nav3, nav4 = st.columns([1.5, 4, 0.5, 1], gap="small")
     with nav1: st.markdown(f"<h3 style='margin-top: -5px; color: {text_main};'>🩺 NursBot</h3>", unsafe_allow_html=True)
     with nav2: st.markdown('<div class="nav-links"><span>Features</span><span>How It Works</span><span>Benefits</span><span>Demo</span><span>About</span></div>', unsafe_allow_html=True)
-    with nav3: st.button("☀️" if st.session_state.dark_mode else "🌙", on_click=toggle_theme, key="theme_btn")
+    with nav3:
+        icon = "☀️" if st.session_state.dark_mode else "🌙"
+        st.button(icon, on_click=toggle_theme, key="theme_btn")
     with nav4:
         if st.button("Get Started", type="primary", use_container_width=True):
             st.session_state.app_started = True
@@ -189,7 +202,8 @@ if not st.session_state.app_started:
                 st.rerun()
         with btn_col2: st.button("Learn More", use_container_width=True)
 
-    with col2: st.image("nurse.png", use_container_width=True)
+    with col2:
+        st.image("nurse.png", use_container_width=True)
 
 
 # --- VIEW 2: GEMINI / CHATGPT STYLE APP ---
@@ -224,19 +238,20 @@ else:
 
     # 2. MAIN LAYOUT TOGGLE
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns([3, 1], gap="large")
+        chat_col, studio_col = st.columns(, gap="large")
     else:
         chat_col = st.container()
 
     # 3. CENTER PANE: Chat & Input
     with chat_col:
-        _, head_btn = st.columns([5, 1])
+        _, head_btn = st.columns()
         with head_btn:
             toggle_label = "✖ Close Studio" if st.session_state.studio_expanded else "⚡ Open Studio"
             if st.button(toggle_label, use_container_width=True):
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
 
+        # REDUCED HEIGHT: Keeps the text box visible on laptop screens!
         chat_container = st.container(height=400, border=False) 
         
         with chat_container:
@@ -247,17 +262,24 @@ else:
             if len(current_messages) == 0:
                 st.markdown(f"<h1 style='color:{text_main}; text-align:center; margin-top:80px;'>How can I help you today?</h1>", unsafe_allow_html=True)
 
-        uploaded_file, app_mode = None, "Clinical Vision (Image)"
+        # Tools Popover (Resting just above the chat input)
+        uploaded_file = None
+        app_mode = "Clinical Vision (Image)"
         
         with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
             app_mode = st.selectbox("Select AI Capability:", ["Clinical Vision (Image)", "Video Analysis", "Speech-to-Text", "Clinical Quiz"])
-            if app_mode == "Clinical Vision (Image)": uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
-            elif app_mode == "Video Analysis": uploaded_file = st.file_uploader("Upload video", type=["mp4", "mov"])
-            elif app_mode == "Speech-to-Text": uploaded_file = st.file_uploader("Upload audio", type=["wav", "mp3"])
+            
+            if app_mode == "Clinical Vision (Image)":
+                uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
+            elif app_mode == "Video Analysis":
+                uploaded_file = st.file_uploader("Upload video", type=["mp4", "mov"])
+            elif app_mode == "Speech-to-Text":
+                uploaded_file = st.file_uploader("Upload audio", type=["wav", "mp3"])
             elif app_mode == "Clinical Quiz":
                 st.slider("Questions", 1, 10, 5)
                 st.selectbox("Difficulty", ["Beginner", "Advanced", "Specialist"])
 
+        # Sticky Chat Input
         if user_input := st.chat_input(f"Message NursBot ({app_mode})..."):
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
             st.rerun() 
@@ -269,39 +291,39 @@ else:
             with st.chat_message("assistant"):
                 try:
                     if app_mode == "Clinical Vision (Image)":
-                        agent_input = [HumanMessage(content=latest_user_input)]
                         if uploaded_file is not None:
                             img_bytes = uploaded_file.getvalue()
                             encoded_img = base64.b64encode(img_bytes).decode("utf-8")
-                            agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encoded_img}"}}])]
+                            image_data = f"data:image/jpeg;base64,{encoded_img}"
+                            agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
+                        else:
+                            agent_input = [HumanMessage(content=latest_user_input)]
 
                         with st.spinner("Analyzing clinical data..."):
                             response = agent_executor.invoke({"input": agent_input, "chat_history": current_messages[:-1]})
                         
-                        # FEATURE 3: Removed Regex entirely. Safely extracting dictionary text.
-                        raw_output = response.get("output", "")
-                        if isinstance(raw_output, dict) and 'text' in raw_output:
-                            final_text = raw_output['text']
-                        else:
-                            final_text = str(raw_output)
-
-                        st.write_stream(stream_text(final_text))
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": final_text})
+                        raw_output = str(response.get("output", ""))
+                        match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
+                        full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
+                        
+                        st.markdown(full_response)
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
+                        st.rerun()
 
                     elif app_mode == "Video Analysis":
-                        mock_text = "*(Teammate's Video API logic will process this prompt)*"
-                        st.write_stream(stream_text(mock_text))
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": mock_text})
+                        st.markdown("*(Teammate's Video API logic will process this prompt)*")
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Video API logic will process this prompt)*"})
+                        st.rerun()
                         
                     elif app_mode == "Speech-to-Text":
-                        mock_text = "*(Teammate's Speech API logic will process this prompt)*"
-                        st.write_stream(stream_text(mock_text))
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": mock_text})
+                        st.markdown("*(Teammate's Speech API logic will process this prompt)*")
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Speech API logic will process this prompt)*"})
+                        st.rerun()
 
                     elif app_mode == "Clinical Quiz":
-                        mock_text = "*(Teammate's Quiz logic will process this prompt)*"
-                        st.write_stream(stream_text(mock_text))
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": mock_text})
+                        st.markdown("*(Teammate's Quiz logic will process this prompt)*")
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Quiz logic will process this prompt)*"})
+                        st.rerun()
 
                 except Exception as e:
                     st.error(f"🚨 Error: {str(e)}")
