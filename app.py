@@ -109,7 +109,6 @@ if "chat_counter" not in st.session_state:
 def toggle_theme():
     st.session_state.dark_mode = not st.session_state.dark_mode
 
-# Helper to get a dynamic title based on the user's first message
 def get_chat_title(chat_id, messages):
     if not messages:
         return chat_id
@@ -125,12 +124,14 @@ if st.session_state.dark_mode:
     text_sub = "#C4C7C5"
     nav_color = "#E3E3E3"
     divider_color = "#444746"
+    card_hover = "rgba(255,255,255,0.08)"
 else:
     bg_color = "#FFFFFF"
     text_main = "#1F2937"
     text_sub = "#4B5563"
     nav_color = "#4B5563"
     divider_color = "#E5E7EB"
+    card_hover = "rgba(26, 115, 232, 0.05)" # Subtle blue tint on light mode
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
@@ -142,11 +143,12 @@ st.markdown(f"""
     /* Blue Primary Buttons */
     div[data-testid="stButton"] button[kind="primary"] {{
         background-color: #1A73E8 !important; border-color: #1A73E8 !important; color: white !important; border-radius: 8px !important;
+        font-weight: 600; transition: all 0.2s ease;
     }}
-    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; }}
+    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; transform: translateY(-1px); }}
     
     /* Sidebar History Button Styling */
-    .stButton > button {{ text-align: left !important; }}
+    .stButton > button {{ text-align: left !important; transition: all 0.2s ease; }}
     
     /* Typography */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
@@ -155,13 +157,19 @@ st.markdown(f"""
     .hero-title span {{ color: #0d9488; }}
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
-    /* Studio Cards */
+    /* Smoother Studio Cards */
     .studio-card {{
         background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px;
-        padding: 15px; margin-bottom: 12px; cursor: pointer; transition: 0.2s;
+        padding: 15px; margin-bottom: 12px; cursor: pointer; 
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Buttery smooth animation */
         color: {text_main}; font-weight: 500; display: flex; align-items: center; gap: 10px;
     }}
-    .studio-card:hover {{ border-color: #1A73E8; background: rgba(255,255,255,0.05); }}
+    .studio-card:hover {{ 
+        border-color: #1A73E8; 
+        background: {card_hover}; 
+        transform: translateY(-3px); /* Lifts the card up slightly */
+        box-shadow: 0 6px 12px rgba(0,0,0,0.1); 
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -200,15 +208,13 @@ if not st.session_state.app_started:
 
 # --- VIEW 2: GEMINI / CHATGPT STYLE APP ---
 else:
-    # Get active session messages
     current_messages = st.session_state.chat_sessions[st.session_state.current_chat]
 
     # 1. LEFT PANE: Dynamic Sidebar History
     with st.sidebar:
-        st.markdown(f"<h3 style='color:{text_main};'>🩺 NursBot</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
         
-        # Create New Chat Logic
-        if st.button("➕ New chat", use_container_width=True):
+        if st.button("➕ New chat", type="primary", use_container_width=True):
             st.session_state.chat_counter += 1
             new_chat_name = f"Chat {st.session_state.chat_counter}"
             st.session_state.chat_sessions[new_chat_name] = []
@@ -216,12 +222,10 @@ else:
             st.rerun()
             
         st.write("<br>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color:{text_sub}; font-size:14px; font-weight:600;'>Recent</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color:{text_sub}; font-size:12px; font-weight:700; letter-spacing: 1px;'>RECENT</p>", unsafe_allow_html=True)
         
-        # Render dynamic history buttons
         for chat_id in reversed(list(st.session_state.chat_sessions.keys())):
             title = get_chat_title(chat_id, st.session_state.chat_sessions[chat_id])
-            # Highlight the currently active chat
             is_active = "🔹 " if chat_id == st.session_state.current_chat else "💬 "
             if st.button(f"{is_active}{title}", key=f"hist_{chat_id}", use_container_width=True):
                 st.session_state.current_chat = chat_id
@@ -234,32 +238,31 @@ else:
 
     # 2. MAIN LAYOUT TOGGLE
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns([3, 1], gap="large")
+        chat_col, studio_col = st.columns(, gap="large")
     else:
         chat_col = st.container()
 
     # 3. CENTER PANE: Chat & Input
     with chat_col:
-        _, head_btn = st.columns([5, 1])
-        
+        _, head_btn = st.columns()
         with head_btn:
             toggle_label = "✖ Close Studio" if st.session_state.studio_expanded else "⚡ Open Studio"
-
             if st.button(toggle_label, use_container_width=True):
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
 
-        # Render Chat Messages
-        chat_container = st.container(height=550, border=False)
+        # REDUCED HEIGHT: Keeps the text box visible on laptop screens!
+        chat_container = st.container(height=400, border=False) 
+        
         with chat_container:
             for message in current_messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
             
             if len(current_messages) == 0:
-                st.markdown(f"<h1 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h1>", unsafe_allow_html=True)
+                st.markdown(f"<h1 style='color:{text_main}; text-align:center; margin-top:80px;'>How can I help you today?</h1>", unsafe_allow_html=True)
 
-        # Gemini-style Tools popover placed directly above the chat box
+        # Tools Popover (Resting just above the chat input)
         uploaded_file = None
         app_mode = "Clinical Vision (Image)"
         
@@ -276,7 +279,7 @@ else:
                 st.slider("Questions", 1, 10, 5)
                 st.selectbox("Difficulty", ["Beginner", "Advanced", "Specialist"])
 
-        # Native Streamlit Chat Input
+        # Sticky Chat Input
         if user_input := st.chat_input(f"Message NursBot ({app_mode})..."):
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
             st.rerun() 
@@ -326,7 +329,7 @@ else:
                     st.error(f"🚨 Error: {str(e)}")
 
 
-    # 4. RIGHT PANE: Studio (Only renders if expanded)
+    # 4. RIGHT PANE: Studio
     if st.session_state.studio_expanded:
         with studio_col:
             st.markdown(f"<h3 style='color: {text_main}; margin-top:0px;'>Studio</h3>", unsafe_allow_html=True)
