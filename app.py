@@ -238,15 +238,17 @@ else:
 
     # 2. MAIN LAYOUT TOGGLE
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns(, gap="large")
+        chat_col, studio_col = st.columns([3, 1], gap="large")
     else:
         chat_col = st.container()
 
     # 3. CENTER PANE: Chat & Input
     with chat_col:
-        _, head_btn = st.columns()
+        _, head_btn = st.columns([5,1])
+        
         with head_btn:
             toggle_label = "✖ Close Studio" if st.session_state.studio_expanded else "⚡ Open Studio"
+
             if st.button(toggle_label, use_container_width=True):
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
