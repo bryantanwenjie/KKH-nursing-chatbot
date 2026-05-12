@@ -34,7 +34,7 @@ def initialize_retriever():
     try:
         # Check if database already exists on disk
         if os.path.exists(persist_directory) and os.listdir(persist_directory):
-            vectorstore = Chroma(persist_dir=persist_directory, embedding_function=embeddings)
+            vectorstore = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
             return vectorstore.as_retriever()
             
         # Otherwise, build it for the first time
