@@ -94,18 +94,33 @@ agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 if "app_started" not in st.session_state:
     st.session_state.app_started = False
 if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = True # Defaulting to Dark Mode like Gemini
+    st.session_state.dark_mode = True 
 if "studio_expanded" not in st.session_state:
-    st.session_state.studio_expanded = False # Studio closed by default for wider chat
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.studio_expanded = False 
+
+# --- REAL CHAT HISTORY SYSTEM ---
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = {"New Chat": []}
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = "New Chat"
+if "chat_counter" not in st.session_state:
+    st.session_state.chat_counter = 1
 
 def toggle_theme():
     st.session_state.dark_mode = not st.session_state.dark_mode
 
+# Helper to get a dynamic title based on the user's first message
+def get_chat_title(chat_id, messages):
+    if not messages:
+        return chat_id
+    for m in messages:
+        if m["role"] == "user":
+            return m["content"][:20] + "..."
+    return chat_id
+
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    bg_color = "#131314" # Exact Gemini Dark Gray
+    bg_color = "#131314" 
     text_main = "#E3E3E3"
     text_sub = "#C4C7C5"
     nav_color = "#E3E3E3"
@@ -131,11 +146,7 @@ st.markdown(f"""
     div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; }}
     
     /* Sidebar History Button Styling */
-    .history-btn {{
-        width: 100%; text-align: left; background: none; border: none; color: {text_sub};
-        padding: 8px; border-radius: 6px; cursor: pointer; font-size: 14px; margin-bottom: 5px;
-    }}
-    .history-btn:hover {{ background: rgba(255,255,255,0.1); color: {text_main}; }}
+    .stButton > button {{ text-align: left !important; }}
     
     /* Typography */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
@@ -189,27 +200,32 @@ if not st.session_state.app_started:
 
 # --- VIEW 2: GEMINI / CHATGPT STYLE APP ---
 else:
-    # 1. LEFT PANE: Gemini-Style Sidebar History
+    # Get active session messages
+    current_messages = st.session_state.chat_sessions[st.session_state.current_chat]
+
+    # 1. LEFT PANE: Dynamic Sidebar History
     with st.sidebar:
-        # Top Menu Items
         st.markdown(f"<h3 style='color:{text_main};'>🩺 NursBot</h3>", unsafe_allow_html=True)
-        if st.button("📝 New chat", use_container_width=True):
-            st.session_state.messages = []
+        
+        # Create New Chat Logic
+        if st.button("➕ New chat", use_container_width=True):
+            st.session_state.chat_counter += 1
+            new_chat_name = f"Chat {st.session_state.chat_counter}"
+            st.session_state.chat_sessions[new_chat_name] = []
+            st.session_state.current_chat = new_chat_name
             st.rerun()
             
         st.write("<br>", unsafe_allow_html=True)
-        
-        # Recent Chats Section
         st.markdown(f"<p style='color:{text_sub}; font-size:14px; font-weight:600;'>Recent</p>", unsafe_allow_html=True)
         
-        # Using custom HTML for sleek, borderless history buttons
-        st.markdown(f"""
-            <button class="history-btn">💬 Fluid Requirement Calc...</button>
-            <button class="history-btn">💬 Deep Research Session...</button>
-            <button class="history-btn">💬 Image Analysis - ECG...</button>
-            <button class="history-btn">💬 Streamlit Deployment Fixes...</button>
-            <button class="history-btn">💬 Quiz: Ward Protocols...</button>
-        """, unsafe_allow_html=True)
+        # Render dynamic history buttons
+        for chat_id in reversed(list(st.session_state.chat_sessions.keys())):
+            title = get_chat_title(chat_id, st.session_state.chat_sessions[chat_id])
+            # Highlight the currently active chat
+            is_active = "🔹 " if chat_id == st.session_state.current_chat else "💬 "
+            if st.button(f"{is_active}{title}", key=f"hist_{chat_id}", use_container_width=True):
+                st.session_state.current_chat = chat_id
+                st.rerun()
         
         st.divider()
         if st.button("⬅ Back to Home", use_container_width=True):
@@ -218,34 +234,32 @@ else:
 
     # 2. MAIN LAYOUT TOGGLE
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns([3, 1], gap="large")
+        chat_col, studio_col = st.columns(, gap="large")
     else:
         chat_col = st.container()
 
     # 3. CENTER PANE: Chat & Input
     with chat_col:
-        # Header Row: Toggle Studio Button
-        _, head_btn = st.columns([5, 1])
+        _, head_btn = st.columns()
         with head_btn:
             toggle_label = "✖ Close Studio" if st.session_state.studio_expanded else "⚡ Open Studio"
             if st.button(toggle_label, use_container_width=True):
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
 
-        # Render Chat Messages inside a container
+        # Render Chat Messages
         chat_container = st.container(height=550, border=False)
         with chat_container:
-            for message in st.session_state.messages:
+            for message in current_messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
             
-            if len(st.session_state.messages) == 0:
+            if len(current_messages) == 0:
                 st.markdown(f"<h1 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h1>", unsafe_allow_html=True)
 
-        # THE GEMINI-STYLE TOOLS & ATTACHMENT POPOVER
-        # This sits perfectly above the text input
+        # Gemini-style Tools popover placed directly above the chat box
         uploaded_file = None
-        app_mode = "Clinical Vision (Image)" # Default
+        app_mode = "Clinical Vision (Image)"
         
         with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
             app_mode = st.selectbox("Select AI Capability:", ["Clinical Vision (Image)", "Video Analysis", "Speech-to-Text", "Clinical Quiz"])
@@ -260,18 +274,17 @@ else:
                 st.slider("Questions", 1, 10, 5)
                 st.selectbox("Difficulty", ["Beginner", "Advanced", "Specialist"])
 
-        # The Chat Input (Sticky at the bottom)
+        # Native Streamlit Chat Input
         if user_input := st.chat_input(f"Message NursBot ({app_mode})..."):
-            st.session_state.messages.append({"role": "user", "content": user_input})
-            st.rerun() # Force rerun to display user message instantly
+            st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
+            st.rerun() 
 
-    # Run AI Logic outside the input block to maintain UI state
-    if len(st.session_state.messages) > 0 and st.session_state.messages[-1]["role"] == "user":
-        latest_user_input = st.session_state.messages[-1]["content"]
+    # Run AI Logic
+    if len(current_messages) > 0 and current_messages[-1]["role"] == "user":
+        latest_user_input = current_messages[-1]["content"]
         with chat_container:
             with st.chat_message("assistant"):
                 try:
-                    # --- TEAM ROUTING LOGIC ---
                     if app_mode == "Clinical Vision (Image)":
                         if uploaded_file is not None:
                             img_bytes = uploaded_file.getvalue()
@@ -282,29 +295,29 @@ else:
                             agent_input = [HumanMessage(content=latest_user_input)]
 
                         with st.spinner("Analyzing clinical data..."):
-                            response = agent_executor.invoke({"input": agent_input, "chat_history": st.session_state.messages[:-1]})
+                            response = agent_executor.invoke({"input": agent_input, "chat_history": current_messages[:-1]})
                         
                         raw_output = str(response.get("output", ""))
                         match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
                         full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
                         
                         st.markdown(full_response)
-                        st.session_state.messages.append({"role": "assistant", "content": full_response})
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
                         st.rerun()
 
                     elif app_mode == "Video Analysis":
                         st.markdown("*(Teammate's Video API logic will process this prompt)*")
-                        st.session_state.messages.append({"role": "assistant", "content": "*(Teammate's Video API logic will process this prompt)*"})
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Video API logic will process this prompt)*"})
                         st.rerun()
                         
                     elif app_mode == "Speech-to-Text":
                         st.markdown("*(Teammate's Speech API logic will process this prompt)*")
-                        st.session_state.messages.append({"role": "assistant", "content": "*(Teammate's Speech API logic will process this prompt)*"})
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Speech API logic will process this prompt)*"})
                         st.rerun()
 
                     elif app_mode == "Clinical Quiz":
                         st.markdown("*(Teammate's Quiz logic will process this prompt)*")
-                        st.session_state.messages.append({"role": "assistant", "content": "*(Teammate's Quiz logic will process this prompt)*"})
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Quiz logic will process this prompt)*"})
                         st.rerun()
 
                 except Exception as e:
