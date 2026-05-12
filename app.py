@@ -1,14 +1,9 @@
 import base64
 import os
 import re
+import time
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
-
-# --- THE MEMORY NUKE ---
-if "nuke_complete" not in st.session_state:
-    st.session_state.clear()
-    st.session_state.nuke_complete = True
-# -----------------------
 
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -18,7 +13,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="NursBot | Clinical AI", page_icon="🏥", layout="wide")
@@ -28,22 +23,39 @@ if "GOOGLE_API_KEY" in st.secrets:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
 # ==========================================
-# ======= BACKEND (DO NOT TOUCH) ===========
+# ======= BACKEND & CLINICAL LOGIC =========
 # ==========================================
 @st.cache_resource(show_spinner=False)
 def initialize_retriever():
+    """Initializes the Vector DB with persistent local storage to prevent rebuilding."""
+    persist_directory = "./chroma_db"
+    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
     try:
-        with st.spinner("Building unlimited Vector Database with Hugging Face..."):
-            loader = PyPDFLoader("Section 01 - Medical Emergencies.pdf")
+        # Check if database already exists on disk
+        if os.path.exists(persist_directory) and os.listdir(persist_directory):
+            vectorstore = Chroma(persist_dir=persist_directory, embedding_function=embeddings)
+            return vectorstore.as_retriever()
+            
+        # Otherwise, build it for the first time
+        with st.spinner("Building Vector Database for the first time... (This will be cached)"):
+            pdf_path = "Section 01 - Medical Emergencies.pdf"
+            if not os.path.exists(pdf_path):
+                st.warning(f"File '{pdf_path}' not found. Vector DB will be empty.")
+                return None
+                
+            loader = PyPDFLoader(pdf_path)
             docs = loader.load()
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
             chunks = text_splitter.split_documents(docs)
 
-            embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-            vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings)
-            
+            vectorstore = Chroma.from_documents(
+                documents=chunks, 
+                embedding=embeddings, 
+                persist_directory=persist_directory
+            )
             return vectorstore.as_retriever()
-    
+            
     except Exception as e:
         st.error(f"🚨 Vector DB Error: {str(e)}")
         st.stop()
@@ -53,16 +65,30 @@ retriever = initialize_retriever()
 @tool
 def search_nursing_protocols(query: str) -> str:
     """Search the KKH Medical Emergencies PDF for clinical guidelines."""
+    if not retriever:
+        return "Error: Database not initialized. Please ensure the PDF is loaded."
+        
     docs = retriever.invoke(query)
-    return "\n\n".join([doc.page_content for doc in docs])
+    # Appending Page Numbers for Clinical Citation
+    results = []
+    for doc in docs:
+        page = doc.metadata.get('page', 'Unknown Page')
+        results.append(f"[Source: Page {page}]\n{doc.page_content}")
+    return "\n\n---\n\n".join(results)
 
 @tool
 def calculate_fluid_requirement(weight_kg: float) -> str:
     """Calculates daily fluid requirements (Holliday-Segar Formula)."""
+    warning = ""
+    # Clinical Safety Guardrail
+    if weight_kg < 2.0 or weight_kg > 80.0:
+        warning = "\n\n⚠️ **CLINICAL WARNING:** Weight is outside standard pediatric ranges. Verify applicability of Holliday-Segar formula for neonates or fluid-restricted adults."
+        
     if weight_kg <= 10: res = weight_kg * 100
     elif weight_kg <= 20: res = 1000 + (weight_kg - 10) * 50
     else: res = 1500 + (weight_kg - 20) * 20
-    return f"The calculated fluid requirement is {res} mL/day."
+    
+    return f"The calculated fluid requirement is {res} mL/day.{warning}"
 
 tools = [calculate_fluid_requirement, search_nursing_protocols]
 
@@ -71,19 +97,30 @@ llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
 prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a strictly professional KKH Clinical Nursing Assistant. 
     
-    Your ONLY purpose is to answer questions related to clinical protocols, nursing guidelines, and medical topics based on the provided KKH documents. 
-    
     CRITICAL RULES:
-    1. If a user asks a question unrelated to healthcare, nursing, or KKH (e.g., recipes, general technology, movies, casual chat), you MUST politely refuse to answer. 
-    2. Do NOT use your general world knowledge to answer off-topic questions. 
-    3. If refusing, gently remind the user that you are a clinical assistant and ask how you can help with medical protocols today."""),
+    1. If a user asks a question unrelated to healthcare, nursing, or KKH, politely refuse.
+    2. Do NOT use general knowledge for KKH protocols; ALWAYS use the `search_nursing_protocols` tool.
+    3. When quoting protocols, mention the Source Page Number provided by the tool.
+    4. If calculating fluids, clearly display the math and any clinical warnings.
+    5. Be concise, structured, and use bullet points for readability.
+    """),
     ("placeholder", "{chat_history}"),
-    ("placeholder", "{input}"),
+    ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
 ])
 
 agent = create_tool_calling_agent(llm, tools, prompt)
 agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+
+# Helper function to format history for LangChain
+def get_langchain_history(messages):
+    history = []
+    for m in messages:
+        if m["role"] == "user":
+            history.append(HumanMessage(content=m["content"]))
+        else:
+            history.append(AIMessage(content=m["content"]))
+    return history
 
 
 # ==========================================
@@ -97,14 +134,15 @@ if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = True 
 if "studio_expanded" not in st.session_state:
     st.session_state.studio_expanded = False 
-
-# --- REAL CHAT HISTORY SYSTEM ---
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = {"New Chat": []}
 if "current_chat" not in st.session_state:
     st.session_state.current_chat = "New Chat"
 if "chat_counter" not in st.session_state:
     st.session_state.chat_counter = 1
+# Used to trigger prompts from the Studio menu
+if "studio_prompt_trigger" not in st.session_state:
+    st.session_state.studio_prompt_trigger = None
 
 def toggle_theme():
     st.session_state.dark_mode = not st.session_state.dark_mode
@@ -124,6 +162,7 @@ if st.session_state.dark_mode:
     text_sub = "#C4C7C5"
     nav_color = "#E3E3E3"
     divider_color = "#444746"
+    card_bg = "#1E1F20"
     card_hover = "rgba(255,255,255,0.08)"
 else:
     bg_color = "#FFFFFF"
@@ -131,44 +170,36 @@ else:
     text_sub = "#4B5563"
     nav_color = "#4B5563"
     divider_color = "#E5E7EB"
-    card_hover = "rgba(26, 115, 232, 0.05)" # Subtle blue tint on light mode
+    card_bg = "#F9FAFB"
+    card_hover = "rgba(26, 115, 232, 0.05)"
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
-    /* Apply Background Color */
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
-    /* Blue Primary Buttons */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #1A73E8 !important; border-color: #1A73E8 !important; color: white !important; border-radius: 8px !important;
-        font-weight: 600; transition: all 0.2s ease;
+        background-color: #1A73E8 !important; border-color: #1A73E8 !important; color: white !important; border-radius: 8px !important; font-weight: 600;
     }}
-    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; transform: translateY(-1px); }}
+    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; }}
     
-    /* Sidebar History Button Styling */
-    .stButton > button {{ text-align: left !important; transition: all 0.2s ease; }}
-    
-    /* Typography */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
     .badge {{ background-color: #E8F0FE; color: #1A73E8; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 1rem; border: 1px solid #D2E3FC; }}
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
     .hero-title span {{ color: #0d9488; }}
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
-    /* Smoother Studio Cards */
-    .studio-card {{
-        background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px;
-        padding: 15px; margin-bottom: 12px; cursor: pointer; 
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Buttery smooth animation */
-        color: {text_main}; font-weight: 500; display: flex; align-items: center; gap: 10px;
+    .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
+    
+    .disclaimer-box {{ font-size: 11px; color: {text_sub}; background: {card_bg}; padding: 10px; border-radius: 8px; margin-top: 30px; text-align: center; border: 1px solid {divider_color}; }}
+    
+    /* Interactive Studio Buttons Wrapper */
+    .studio-btn-wrapper div[data-testid="stButton"] button {{
+        width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
     }}
-    .studio-card:hover {{ 
-        border-color: #1A73E8; 
-        background: {card_hover}; 
-        transform: translateY(-3px); /* Lifts the card up slightly */
-        box-shadow: 0 6px 12px rgba(0,0,0,0.1); 
+    .studio-btn-wrapper div[data-testid="stButton"] button:hover {{
+        border-color: #1A73E8; background: {card_hover}; transform: translateY(-2px);
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -203,14 +234,17 @@ if not st.session_state.app_started:
         with btn_col2: st.button("Learn More", use_container_width=True)
 
     with col2:
-        st.image("nurse.png", use_container_width=True)
+        try:
+            st.image("nurse.png", use_container_width=True)
+        except:
+            st.info("Visual Placeholder: 'nurse.png' missing")
 
 
-# --- VIEW 2: GEMINI / CHATGPT STYLE APP ---
+# --- VIEW 2: APP CHAT INTERFACE ---
 else:
     current_messages = st.session_state.chat_sessions[st.session_state.current_chat]
 
-    # 1. LEFT PANE: Dynamic Sidebar History
+    # 1. LEFT PANE: Sidebar History & Safety
     with st.sidebar:
         st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
         
@@ -236,23 +270,31 @@ else:
             st.session_state.app_started = False
             st.rerun()
 
-    # 2. MAIN LAYOUT TOGGLE
+        # Clinical Disclaimer Guardrail
+        st.markdown(
+            f'<div class="disclaimer-box">⚠️ <b>Clinical Disclaimer</b><br>NursBot is an AI assistant. Do not use as a substitute for clinical judgment. Always verify with official KKH Protocol Manuals.</div>', 
+            unsafe_allow_html=True
+        )
+
+    # 2. MAIN LAYOUT
     if st.session_state.studio_expanded:
         chat_col, studio_col = st.columns([3, 1], gap="large")
     else:
         chat_col = st.container()
 
-    # 3. CENTER PANE: Chat & Input
+    # 3. CENTER PANE: Chat
     with chat_col:
-        _, head_btn = st.columns([5, 1])
-        with head_btn:
+        # Context Breadcrumb & Studio Toggle
+        c1, c2 = st.columns([4, 1])
+        with c1:
+            st.markdown(f"<div class='breadcrumb'>📁 KKH Workspace / Section 01 - Medical Emergencies</div>", unsafe_allow_html=True)
+        with c2:
             toggle_label = "✖ Close Studio" if st.session_state.studio_expanded else "⚡ Open Studio"
             if st.button(toggle_label, use_container_width=True):
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
 
-        # REDUCED HEIGHT: Keeps the text box visible on laptop screens!
-        chat_container = st.container(height=400, border=False) 
+        chat_container = st.container(height=450, border=False) 
         
         with chat_container:
             for message in current_messages:
@@ -260,27 +302,26 @@ else:
                     st.markdown(message["content"])
             
             if len(current_messages) == 0:
-                st.markdown(f"<h1 style='color:{text_main}; text-align:center; margin-top:80px;'>How can I help you today?</h1>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h2>", unsafe_allow_html=True)
 
-        # Tools Popover (Resting just above the chat input)
+        # Tools Popover
         uploaded_file = None
-        app_mode = "Clinical Vision (Image)"
+        app_mode = "Clinical Text & Docs"
         
         with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
-            app_mode = st.selectbox("Select AI Capability:", ["Clinical Vision (Image)", "Video Analysis", "Speech-to-Text", "Clinical Quiz"])
-            
-            if app_mode == "Clinical Vision (Image)":
+            app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Video Analysis", "Speech-to-Text"])
+            if app_mode == "Vision (Image)":
                 uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
-            elif app_mode == "Video Analysis":
-                uploaded_file = st.file_uploader("Upload video", type=["mp4", "mov"])
-            elif app_mode == "Speech-to-Text":
-                uploaded_file = st.file_uploader("Upload audio", type=["wav", "mp3"])
-            elif app_mode == "Clinical Quiz":
-                st.slider("Questions", 1, 10, 5)
-                st.selectbox("Difficulty", ["Beginner", "Advanced", "Specialist"])
 
-        # Sticky Chat Input
-        if user_input := st.chat_input(f"Message NursBot ({app_mode})..."):
+        # Input Handling (Standard Chat Input OR Studio Trigger)
+        user_input = st.chat_input(f"Message NursBot ({app_mode})...")
+        
+        # If Studio button was clicked, override the user input with the studio prompt
+        if st.session_state.studio_prompt_trigger:
+            user_input = st.session_state.studio_prompt_trigger
+            st.session_state.studio_prompt_trigger = None # Reset it immediately
+
+        if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
             st.rerun() 
 
@@ -290,52 +331,63 @@ else:
         with chat_container:
             with st.chat_message("assistant"):
                 try:
-                    if app_mode == "Clinical Vision (Image)":
-                        if uploaded_file is not None:
-                            img_bytes = uploaded_file.getvalue()
-                            encoded_img = base64.b64encode(img_bytes).decode("utf-8")
-                            image_data = f"data:image/jpeg;base64,{encoded_img}"
-                            agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
-                        else:
-                            agent_input = [HumanMessage(content=latest_user_input)]
+                    # Map standard history to LangChain formats
+                    chat_history_lc = get_langchain_history(current_messages[:-1])
 
-                        with st.spinner("Analyzing clinical data..."):
-                            response = agent_executor.invoke({"input": agent_input, "chat_history": current_messages[:-1]})
-                        
-                        raw_output = str(response.get("output", ""))
-                        match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
-                        full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
-                        
-                        st.markdown(full_response)
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
-                        st.rerun()
+                    if app_mode == "Vision (Image)" and uploaded_file is not None:
+                        img_bytes = uploaded_file.getvalue()
+                        encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                        image_data = f"data:image/jpeg;base64,{encoded_img}"
+                        agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
+                    else:
+                        agent_input = latest_user_input
 
-                    elif app_mode == "Video Analysis":
-                        st.markdown("*(Teammate's Video API logic will process this prompt)*")
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Video API logic will process this prompt)*"})
-                        st.rerun()
-                        
-                    elif app_mode == "Speech-to-Text":
-                        st.markdown("*(Teammate's Speech API logic will process this prompt)*")
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Speech API logic will process this prompt)*"})
-                        st.rerun()
-
-                    elif app_mode == "Clinical Quiz":
-                        st.markdown("*(Teammate's Quiz logic will process this prompt)*")
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": "*(Teammate's Quiz logic will process this prompt)*"})
-                        st.rerun()
+                    with st.spinner("Analyzing protocols and calculating..."):
+                        response = agent_executor.invoke({
+                            "input": agent_input, 
+                            "chat_history": chat_history_lc
+                        })
+                    
+                    # Clean up output parsing
+                    raw_output = str(response.get("output", ""))
+                    match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
+                    full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
+                    
+                    # Simulate streaming effect for better UX
+                    def stream_text(text):
+                        for word in text.split(" "):
+                            yield word + " "
+                            time.sleep(0.02)
+                    
+                    st.write_stream(stream_text(full_response))
+                    
+                    st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
+                    # Force a slight pause so the UI catches up before rerunning state
+                    time.sleep(0.1)
+                    st.rerun()
 
                 except Exception as e:
                     st.error(f"🚨 Error: {str(e)}")
 
 
-    # 4. RIGHT PANE: Studio
+    # 4. RIGHT PANE: Interactive Studio
     if st.session_state.studio_expanded:
         with studio_col:
             st.markdown(f"<h3 style='color: {text_main}; margin-top:0px;'>Studio</h3>", unsafe_allow_html=True)
-            st.write("<br>", unsafe_allow_html=True)
+            st.markdown(f"<p style='color:{text_sub}; font-size:13px;'>Quick actions based on context:</p>", unsafe_allow_html=True)
             
-            st.markdown('<div class="studio-card">🎙️ <b>Audio Overview</b><br><span style="font-size:12px; color:gray;">Generate podcast</span></div>', unsafe_allow_html=True)
-            st.markdown('<div class="studio-card">📝 <b>Generate Quiz</b><br><span style="font-size:12px; color:gray;">Test your knowledge</span></div>', unsafe_allow_html=True)
-            st.markdown('<div class="studio-card">📊 <b>Data Table</b><br><span style="font-size:12px; color:gray;">Extract clinical stats</span></div>', unsafe_allow_html=True)
-            st.markdown('<div class="studio-card">🎥 <b>Video Summary</b><br><span style="font-size:12px; color:gray;">Analyze procedure</span></div>', unsafe_allow_html=True)
+            st.markdown('<div class="studio-btn-wrapper">', unsafe_allow_html=True)
+            
+            if st.button("📝 Generate Quiz"):
+                st.session_state.studio_prompt_trigger = "Based on our current conversation and the clinical document, generate a 3-question multiple-choice clinical quiz."
+                st.rerun()
+                
+            if st.button("📊 Extract Data Table"):
+                st.session_state.studio_prompt_trigger = "Extract all numerical dosages, guidelines, or stats from the current topic and present them in a clear Markdown table."
+                st.rerun()
+
+            if st.button("🎙️ Audio Summary"):
+                st.session_state.studio_prompt_trigger = "Provide a podcast-style, conversational script summarizing the main points of our current clinical topic."
+                st.rerun()
+                
+            st.markdown('</div>', unsafe_allow_html=True)
