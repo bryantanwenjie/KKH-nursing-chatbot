@@ -288,6 +288,13 @@ else:
 
     # 1. LEFT PANE: Sidebar History & Safety
     with st.sidebar:
+
+        # ---> DIAGNOSTIC CHECK <---
+        if llm_azure is None:
+            st.error("⚠️ Azure Failed to Load (Check Keys)")
+        else:
+            st.success("✅ Azure is Loaded")
+
         st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
         
         if st.button("➕ New chat", type="primary", use_container_width=True):
@@ -361,27 +368,27 @@ else:
                 st.markdown("<p style='font-size: 14px; font-weight: 600;'>🎤 Click to Speak:</p>", unsafe_allow_html=True)
                 spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
 
-        # Input Handling
-        # --- NEW: State to remember the model choice across reruns ---
+        # --- State to remember the model choice across reruns ---
         if "model_choice" not in st.session_state:
             st.session_state.model_choice = "Gemini"
 
         # Input Handling
         user_input = st.chat_input(f"Message NursBot ({app_mode})...")
         
+        # 1. Did the user use a Studio button?
         if st.session_state.studio_prompt_trigger:
             user_input = st.session_state.studio_prompt_trigger
             st.session_state.studio_prompt_trigger = None 
-            st.session_state.model_choice = "Gemini" # Studio uses Gemini
-            
-        # 👉 JOESON'S TRIGGER: If speech is detected, lock in Azure for this turn
-        if app_mode == "Speech-to-Text" and spoken_text:
-            user_input = spoken_text
-            st.session_state.model_choice = "Azure" 
-            
-        # If normal typing is detected, lock in Gemini
-        elif user_input:
             st.session_state.model_choice = "Gemini" 
+            
+        # 2. Did the user use Speech-to-Text?
+        elif spoken_text:
+            user_input = spoken_text
+            st.session_state.model_choice = "Azure" # Lock in Azure
+            
+        # 3. Did the user type normally?
+        elif user_input:
+            st.session_state.model_choice = "Gemini" # Lock in Gemini
 
         if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
