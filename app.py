@@ -352,21 +352,11 @@ else:
         with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
             app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Speech-to-Text"])
             
-            # 👉 JOESON'S CODE: UI integration to let you pick his Azure LLM
-            model_options = ["Gemini (NursBot Default)"]
-            if llm_azure: 
-                model_options.append("Azure OpenAI (Joeson's Model)")
-                
-            # 👉 NEW: Auto-Select Logic
-            # If Speech-to-Text is chosen and Azure is available, set the default index to 1 (Azure)
-            default_model_idx = 1 if (app_mode == "Speech-to-Text" and llm_azure) else 0
-            
-            selected_model = st.selectbox("Select AI Brain:", model_options, index=default_model_idx)
+            # ---> DELETED THE "Select AI Brain" DROPDOWN <---
             
             if app_mode == "Vision (Image)":
                 uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
                 
-            # 👉 JOESON'S CODE: Speech-to-text triggering logic
             elif app_mode == "Speech-to-Text":
                 st.markdown("<p style='font-size: 14px; font-weight: 600;'>🎤 Click to Speak:</p>", unsafe_allow_html=True)
                 spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
@@ -401,10 +391,16 @@ else:
                         image_data = f"data:image/jpeg;base64,{encoded_img}"
                         agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
 
-                    with st.spinner(f"Analyzing using {selected_model.split(' ')[0]}..."):
-                        
-                        # 👉 JOESON'S CODE: Dynamically build agent using the selected LLM
-                        active_llm = llm_azure if "Azure" in selected_model and llm_azure else llm_gemini
+                    # ---> NEW: Background logic to choose the model automatically <---
+                    if app_mode == "Speech-to-Text" and llm_azure is not None:
+                        active_llm = llm_azure
+                        loading_text = "Azure OpenAI (Joeson's Model)"
+                    else:
+                        active_llm = llm_gemini
+                        loading_text = "Gemini (NursBot Default)"
+
+                    # ---> NEW: The spinner will now tell you exactly which model is running <---
+                    with st.spinner(f"Analyzing using {loading_text}..."):
                         
                         agent = create_tool_calling_agent(active_llm, tools, prompt)
                         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
