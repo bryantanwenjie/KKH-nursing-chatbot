@@ -356,7 +356,12 @@ else:
             model_options = ["Gemini (NursBot Default)"]
             if llm_azure: 
                 model_options.append("Azure OpenAI (Joeson's Model)")
-            selected_model = st.selectbox("Select AI Brain:", model_options)
+                
+            # 👉 NEW: Auto-Select Logic
+            # If Speech-to-Text is chosen and Azure is available, set the default index to 1 (Azure)
+            default_model_idx = 1 if (app_mode == "Speech-to-Text" and llm_azure) else 0
+            
+            selected_model = st.selectbox("Select AI Brain:", model_options, index=default_model_idx)
             
             if app_mode == "Vision (Image)":
                 uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
