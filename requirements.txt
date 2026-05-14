@@ -1,3 +1,4 @@
+# --- BRYAN'S REQUIREMENTS ---
 langchain>=0.2.14
 langchain-core>=0.2.33
 langchain-community>=0.2.10
@@ -10,3 +11,8 @@ python-dotenv>=1.0.1
 protobuf<=3.20.3
 langchain-huggingface
 sentence-transformers
+
+# --- JOESON'S REQUIREMENTS ---
+streamlit-mic-recorder    # Required for Speech-to-Text
+langchain-openai           # Required for Azure OpenAI integration
+faiss-cpu                  # Required for Joeson's Vector Store
