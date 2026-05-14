@@ -12,10 +12,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 
-# --- JOESON: Logic Imports ---
+# --- JOESON: Logic & STT Imports ---
 from streamlit_mic_recorder import speech_to_text
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -46,33 +46,28 @@ def initialize_retriever():
         if os.path.exists(persist_directory) and os.listdir(persist_directory):
             vectorstore = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
             return vectorstore.as_retriever()
-        
         pdf_path = "Section 01 - Medical Emergencies.pdf"
         if not os.path.exists(pdf_path): return None
-        
         loader = PyPDFLoader(pdf_path)
         docs = loader.load()
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         chunks = text_splitter.split_documents(docs)
         vectorstore = Chroma.from_documents(documents=chunks, embedding=embeddings, persist_directory=persist_directory)
         return vectorstore.as_retriever()
-    except Exception as e:
-        st.error(f"🚨 Vector DB Error: {str(e)}")
-        return None
+    except: return None
 
 retriever = initialize_retriever()
 
 @tool
 def search_nursing_protocols(query: str) -> str:
-    """Original: Search clinical guidelines tool"""
+    """Original Tool: PDF Retrieval"""
     if not retriever: return "Error: Database not initialized."
     docs = retriever.invoke(query)
-    results = [f"[Source: Page {doc.metadata.get('page', 'Unknown')}]\n{doc.page_content}" for doc in docs]
-    return "\n\n---\n\n".join(results)
+    return "\n\n---\n\n".join([f"[Page {d.metadata.get('page', '?')}]\n{d.page_content}" for d in docs])
 
 @tool
 def calculate_fluid_requirement(weight_kg: float) -> str:
-    """Original: Holliday-Segar Formula tool"""
+    """Original Tool: Calculations"""
     if weight_kg <= 10: res = weight_kg * 100
     elif weight_kg <= 20: res = 1000 + (weight_kg - 10) * 50
     else: res = 1500 + (weight_kg - 20) * 20
@@ -81,34 +76,23 @@ def calculate_fluid_requirement(weight_kg: float) -> str:
 tools = [calculate_fluid_requirement, search_nursing_protocols]
 llm_gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
 prompt = ChatPromptTemplate.from_messages([
-    ("system", "You are a professional KKH Clinical Nursing Assistant. Always use tools for protocols."),
+    ("system", "You are a professional KKH Clinical Nursing Assistant."),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
 ])
-agent = create_tool_calling_agent(llm_gemini, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+agent_executor = AgentExecutor(agent=create_tool_calling_agent(llm_gemini, tools, prompt), tools=tools, verbose=False)
 
 # ==========================================
 # ======= JOESON: BACKEND & LOGIC ==========
 # ==========================================
 if "AZURE_OPENAI_API_KEY" in st.secrets:
-    azure_llm = AzureChatOpenAI(
-        azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_key=os.environ["AZURE_OPENAI_API_KEY"],
-        api_version=os.environ["AZURE_OPENAI_API_VERSION"],
-        azure_deployment=AZURE_CHAT_DEPLOY,
-    )
-    azure_embeddings = AzureOpenAIEmbeddings(
-        azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-        api_key=os.environ["AZURE_OPENAI_API_KEY"],
-        api_version=os.environ["AZURE_OPENAI_API_VERSION"],
-        azure_deployment=AZURE_EMBED_DEPLOY,
-    )
+    azure_llm = AzureChatOpenAI(azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"], api_key=os.environ["AZURE_OPENAI_API_KEY"], api_version=os.environ["AZURE_OPENAI_API_VERSION"], azure_deployment=AZURE_CHAT_DEPLOY)
+    azure_embeddings = AzureOpenAIEmbeddings(azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"], api_key=os.environ["AZURE_OPENAI_API_KEY"], api_version=os.environ["AZURE_OPENAI_API_VERSION"], azure_deployment=AZURE_EMBED_DEPLOY)
 
 @st.cache_resource
 def get_joeson_vectorstore():
-    """JOESON: FAISS Vector Store using Azure"""
+    """JOESON: FAISS setup"""
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     PDF_PATHS = [os.path.join(BASE_DIR, "Section 01 - Medical Emergencies.pdf"), os.path.join(BASE_DIR, "formula.pdf")]
     docs = []
@@ -118,37 +102,30 @@ def get_joeson_vectorstore():
     return FAISS.from_documents(chunks, azure_embeddings)
 
 def joeson_answer_logic(question):
-    """JOESON: Azure model logic with specialized calculations"""
+    """JOESON: Calculation & RAG Logic"""
     if "last_topic" not in st.session_state: st.session_state.last_topic = ""
-    q_low = question.lower()
-    if "fluid" in q_low: st.session_state.last_topic = "fluid"
-    if any(x in q_low for x in ["bp", "systolic"]): st.session_state.last_topic = "bp"
-    
     numbers = re.findall(r"\d+\.?\d*", question)
-    if st.session_state.last_topic == "fluid" and numbers:
+    if ("fluid" in question.lower() or st.session_state.last_topic == "fluid") and numbers:
         weight = float(numbers[0])
         daily = min(weight * 100 if weight <= 10 else 1000 + (weight-10)*50 if weight <= 20 else 1500 + (weight-20)*20, 2500)
         st.session_state.last_topic = ""
-        return f"**Azure Result:** Fluid requirement is {daily} ml/day."
-
+        return f"**Joeson's Azure Result:** Fluid requirement is {daily} ml/day."
+    
     vs = get_joeson_vectorstore()
     context = "\n\n".join([d.page_content for d in vs.as_retriever().invoke(question)])
     return azure_llm.invoke(f"Context: {context}\n\nQuestion: {question}").content
 
 # ==========================================
-# =========== ORIGINAL: UI SETUP ===========
+# =========== ORIGINAL: UI & CSS ===========
 # ==========================================
 if "app_started" not in st.session_state: st.session_state.app_started = False
 if "dark_mode" not in st.session_state: st.session_state.dark_mode = True 
 if "studio_expanded" not in st.session_state: st.session_state.studio_expanded = False 
 if "chat_sessions" not in st.session_state: st.session_state.chat_sessions = {"New Chat": []}
 if "current_chat" not in st.session_state: st.session_state.current_chat = "New Chat"
-if "app_mode" not in st.session_state: st.session_state.app_mode = "Gemini Agent"
-if "studio_prompt_trigger" not in st.session_state: st.session_state.studio_prompt_trigger = None
 
 bg_color = "#131314" if st.session_state.dark_mode else "#FFFFFF"
 text_main = "#E3E3E3" if st.session_state.dark_mode else "#1F2937"
-card_bg = "#1E1F20" if st.session_state.dark_mode else "#F9FAFB"
 
 st.markdown(f"""
 <style>
@@ -157,47 +134,42 @@ st.markdown(f"""
     .hero-title span {{ color: #0d9488; }}
     .badge {{ background-color: #E8F0FE; color: #1A73E8; padding: 6px 16px; border-radius: 20px; font-weight: 700; }}
     .breadcrumb {{ color: #C4C7C5; font-size: 12px; border-bottom: 1px solid #444746; padding: 10px 0; margin-bottom: 20px; }}
-    .studio-btn-wrapper div[data-testid="stButton"] button {{
-        width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid #444746; border-radius: 12px; padding: 15px; color: {text_main};
-    }}
+    /* Joeson's Right Panel Styling */
+    .joeson-card {{ background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; border: 1px solid #0d9488; margin-bottom: 10px; }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- VIEW 1: LANDING PAGE ---
+# --- LANDING PAGE ---
 if not st.session_state.app_started:
     col1, col2 = st.columns([1.2, 1], gap="large")
     with col1:
         st.markdown('<div class="badge">✨ AI-POWERED CLINICAL ASSISTANT</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-title">Smarter Nursing<br>with <span>AI</span> Support</div>', unsafe_allow_html=True)
-        if st.button("Try Chatbot ➔", type="primary", key="try_btn"):
+        if st.button("Try Chatbot ➔", type="primary"):
             st.session_state.app_started = True
             st.rerun()
-    with col2: st.info("Visual Placeholder: 'nurse.png'")
+    with col2: st.info("nurse.png")
 
-# --- VIEW 2: CHAT INTERFACE ---
+# --- MAIN APP ---
 else:
     with st.sidebar:
         st.markdown(f"<h3 style='color:{text_main};'>🩺 NursBot</h3>", unsafe_allow_html=True)
-        # JOESON: Integrating the engine toggle into your sidebar
-        st.session_state.app_mode = st.radio("AI Engine:", ["Gemini Agent", "Azure (Joeson)"])
-        
         if st.button("➕ New chat", type="primary", use_container_width=True):
             name = f"Chat {len(st.session_state.chat_sessions)+1}"
             st.session_state.chat_sessions[name] = []
             st.session_state.current_chat = name
             st.rerun()
-        
         st.divider()
         for chat_id in reversed(list(st.session_state.chat_sessions.keys())):
-            if st.button(f"💬 {chat_id[:15]}...", key=f"h_{chat_id}", use_container_width=True):
+            if st.button(f"💬 {chat_id}", key=f"h_{chat_id}", use_container_width=True):
                 st.session_state.current_chat = chat_id
                 st.rerun()
 
-    chat_col, studio_col = st.columns([3, 1] if st.session_state.studio_expanded else [1, 0.01])
+    chat_col, studio_col = st.columns([3, 1.2] if st.session_state.studio_expanded else [1, 0.01])
     
     with chat_col:
-        st.markdown("<div class='breadcrumb'>📁 KKH Workspace / Section 01</div>", unsafe_allow_html=True)
-        if st.button("⚡ Studio", use_container_width=True):
+        st.markdown("<div class='breadcrumb'>📁 KKH Workspace / Original Gemini Agent</div>", unsafe_allow_html=True)
+        if st.button("⚡ Open Joeson's Studio" if not st.session_state.studio_expanded else "✖ Close Studio", use_container_width=True):
             st.session_state.studio_expanded = not st.session_state.studio_expanded
             st.rerun()
 
@@ -206,42 +178,46 @@ else:
             for m in st.session_state.chat_sessions[st.session_state.current_chat]:
                 with st.chat_message(m["role"]): st.markdown(m["content"])
 
-        with st.popover("➕ Tools & Attachments"):
-            app_mode = st.selectbox("Mode:", ["Clinical Text", "Vision", "Voice (Joeson)"])
-            # JOESON: Speech-to-Text integration
-            if app_mode == "Voice (Joeson)":
-                voice_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="JOE_STT")
-                if voice_text:
-                    st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": voice_text})
-                    st.rerun()
-
-        user_input = st.chat_input("Message NursBot...")
-        if st.session_state.studio_prompt_trigger:
-            user_input = st.session_state.studio_prompt_trigger
-            st.session_state.studio_prompt_trigger = None
-
+        user_input = st.chat_input("Message Gemini Agent...")
         if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
+            with chat_container:
+                with st.chat_message("assistant"):
+                    res = agent_executor.invoke({"input": user_input, "chat_history": []})
+                    st.markdown(res["output"])
+                    st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": res["output"]})
             st.rerun()
 
-    if len(st.session_state.chat_sessions[st.session_state.current_chat]) > 0 and st.session_state.chat_sessions[st.session_state.current_chat][-1]["role"] == "user":
-        with chat_col:
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    latest = st.session_state.chat_sessions[st.session_state.current_chat][-1]["content"]
-                    # JOESON: Logic routing
-                    if st.session_state.app_mode == "Azure (Joeson)":
-                        ans = joeson_answer_logic(latest)
-                    else:
-                        res = agent_executor.invoke({"input": latest, "chat_history": []})
-                        ans = res["output"]
-                    st.markdown(ans)
-                    st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": ans})
-                    st.rerun()
-
+    # ==========================================
+    # ======= JOESON: RIGHT PANEL (STUDIO) =====
+    # ==========================================
     if st.session_state.studio_expanded:
         with studio_col:
-            st.markdown(f"<h3 style='color:{text_main};'>Studio</h3>", unsafe_allow_html=True)
-            if st.button("📝 Generate Quiz"):
-                st.session_state.studio_prompt_trigger = "Generate a 3-question MCQ quiz."
-                st.rerun()
+            st.markdown(f"<h3 style='color:#0d9488;'>Joeson's Studio</h3>", unsafe_allow_html=True)
+            
+            with st.container(border=True):
+                st.markdown("**Joeson's Voice Input**")
+                # JOESON: Speech to Text
+                voice_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="JOE_MIC_UI")
+                if voice_text:
+                    st.info(f"Joeson Heard: {voice_text}")
+                    with st.spinner("Joeson's Model is thinking..."):
+                        ans = joeson_answer_logic(voice_text)
+                        st.success(ans)
+
+            st.divider()
+            
+            st.markdown("**Joeson's Azure Model**")
+            joe_q = st.text_area("Ask Joeson's Model directly:", placeholder="e.g. Calculate fluid for 15kg", key="joe_input")
+            if st.button("Run Joeson's Logic"):
+                if joe_q:
+                    with st.spinner("Azure RAG Processing..."):
+                        ans = joeson_answer_logic(joe_q)
+                        st.markdown(f"<div class='joeson-card'>{ans}</div>", unsafe_allow_html=True)
+                else:
+                    st.warning("Please enter a query for Joeson.")
+
+            st.divider()
+            st.markdown("Original Studio Actions")
+            if st.button("📝 Generate Quiz (Gemini)"):
+                st.info("Quiz feature triggered")
