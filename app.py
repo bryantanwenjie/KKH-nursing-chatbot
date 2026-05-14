@@ -362,20 +362,31 @@ else:
                 spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
 
         # Input Handling
+        # --- NEW: State to remember the model choice across reruns ---
+        if "model_choice" not in st.session_state:
+            st.session_state.model_choice = "Gemini"
+
+        # Input Handling
         user_input = st.chat_input(f"Message NursBot ({app_mode})...")
         
         if st.session_state.studio_prompt_trigger:
             user_input = st.session_state.studio_prompt_trigger
             st.session_state.studio_prompt_trigger = None 
+            st.session_state.model_choice = "Gemini" # Studio uses Gemini
             
-        # 👉 JOESON'S CODE: Capturing microphone output as user_input
+        # 👉 JOESON'S TRIGGER: If speech is detected, lock in Azure for this turn
         if app_mode == "Speech-to-Text" and spoken_text:
             user_input = spoken_text
+            st.session_state.model_choice = "Azure" 
+            
+        # If normal typing is detected, lock in Gemini
+        elif user_input:
+            st.session_state.model_choice = "Gemini" 
 
         if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
-            st.rerun() 
-
+            st.rerun()
+            
     # Run AI Logic
     if len(current_messages) > 0 and current_messages[-1]["role"] == "user":
         latest_user_input = current_messages[-1]["content"]
