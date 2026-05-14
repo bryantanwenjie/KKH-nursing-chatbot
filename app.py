@@ -13,7 +13,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage
+
+# 👉 JOESON'S CODE: Imports for Azure and Speech-to-Text
+from langchain_openai import AzureChatOpenAI
+from streamlit_mic_recorder import speech_to_text
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="NursBot | Clinical AI", page_icon="🏥", layout="wide")
@@ -21,6 +25,13 @@ st.set_page_config(page_title="NursBot | Clinical AI", page_icon="🏥", layout=
 # --- AUTHENTICATION ---
 if "GOOGLE_API_KEY" in st.secrets:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+
+# 👉 JOESON'S CODE: Azure Authentication setup
+if "AZURE_OPENAI_API_KEY" in st.secrets:
+    os.environ["AZURE_OPENAI_API_KEY"] = st.secrets["AZURE_OPENAI_API_KEY"]
+    os.environ["AZURE_OPENAI_ENDPOINT"] = st.secrets["AZURE_OPENAI_ENDPOINT"]
+    os.environ["AZURE_OPENAI_API_VERSION"] = st.secrets["AZURE_OPENAI_API_VERSION"]
+    os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"] = st.secrets["AZURE_OPENAI_CHAT_DEPLOYMENT"]
 
 # ==========================================
 # ======= BACKEND & CLINICAL LOGIC =========
@@ -35,7 +46,7 @@ def initialize_retriever():
         # Check if database already exists on disk
         if os.path.exists(persist_directory) and os.listdir(persist_directory):
             vectorstore = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
-            return vectorstore.as_retriever()
+            return vectorstore.as_retriever(search_kwargs={"k": 3})
             
         # Otherwise, build it for the first time
         with st.spinner("Building Vector Database for the first time... (This will be cached)"):
@@ -54,7 +65,7 @@ def initialize_retriever():
                 embedding=embeddings, 
                 persist_directory=persist_directory
             )
-            return vectorstore.as_retriever()
+            return vectorstore.as_retriever(search_kwargs={"k": 3})
             
     except Exception as e:
         st.error(f"🚨 Vector DB Error: {str(e)}")
@@ -69,7 +80,6 @@ def search_nursing_protocols(query: str) -> str:
         return "Error: Database not initialized. Please ensure the PDF is loaded."
         
     docs = retriever.invoke(query)
-    # Appending Page Numbers for Clinical Citation
     results = []
     for doc in docs:
         page = doc.metadata.get('page', 'Unknown Page')
@@ -78,21 +88,58 @@ def search_nursing_protocols(query: str) -> str:
 
 @tool
 def calculate_fluid_requirement(weight_kg: float) -> str:
-    """Calculates daily fluid requirements (Holliday-Segar Formula)."""
+    """Calculates daily and hourly fluid requirements (Holliday-Segar Formula)."""
     warning = ""
-    # Clinical Safety Guardrail
     if weight_kg < 2.0 or weight_kg > 80.0:
-        warning = "\n\n⚠️ **CLINICAL WARNING:** Weight is outside standard pediatric ranges. Verify applicability of Holliday-Segar formula for neonates or fluid-restricted adults."
+        warning = "\n\n⚠️ **CLINICAL WARNING:** Weight is outside standard pediatric ranges."
         
-    if weight_kg <= 10: res = weight_kg * 100
-    elif weight_kg <= 20: res = 1000 + (weight_kg - 10) * 50
-    else: res = 1500 + (weight_kg - 20) * 20
+    # 👉 JOESON'S CODE: Hourly calculations added to your existing base logic
+    if weight_kg <= 10: 
+        daily = weight_kg * 100
+        hourly = weight_kg * 4
+    elif weight_kg <= 20: 
+        daily = 1000 + ((weight_kg - 10) * 50)
+        hourly = 40 + ((weight_kg - 10) * 2)
+    else: 
+        daily = 1500 + ((weight_kg - 20) * 20)
+        hourly = 60 + ((weight_kg - 20) * 1)
     
-    return f"The calculated fluid requirement is {res} mL/day.{warning}"
+    # 👉 JOESON'S CODE: Capping the daily fluid at 2500
+    daily = min(daily, 2500)
+    
+    return f"Daily requirement: {daily:.0f} mL/day.\nHourly requirement: {hourly:.0f} mL/hr.{warning}"
 
-tools = [calculate_fluid_requirement, search_nursing_protocols]
+# 👉 JOESON'S CODE: His custom BP logic converted into a LangChain tool
+@tool
+def calculate_systolic_bp(age_years: float) -> str:
+    """Calculates the expected systolic blood pressure for children up to 10 years old."""
+    if age_years < 1/12:
+        return "Expected systolic BP: > 60 mmHg"
+    elif age_years < 1:
+        return "Expected systolic BP: > 70 mmHg"
+    elif age_years <= 10:
+        sbp = 70 + (age_years * 2)
+        return f"Expected systolic BP: > {sbp:.0f} mmHg"
+    else:
+        return "Warning: This formula only covers children up to 10 years old."
 
-llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
+# 👉 JOESON'S CODE: Added his BP tool to your tools list
+tools = [calculate_fluid_requirement, search_nursing_protocols, calculate_systolic_bp]
+
+# Initialize Your Google Model
+llm_gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
+
+# 👉 JOESON'S CODE: Initialize his Azure Model
+try:
+    llm_azure = AzureChatOpenAI(
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", ""),
+        azure_deployment=os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", ""),
+        temperature=0
+    )
+except:
+    llm_azure = None
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", """You are a strictly professional KKH Clinical Nursing Assistant. 
@@ -101,16 +148,13 @@ prompt = ChatPromptTemplate.from_messages([
     1. If a user asks a question unrelated to healthcare, nursing, or KKH, politely refuse.
     2. Do NOT use general knowledge for KKH protocols; ALWAYS use the `search_nursing_protocols` tool.
     3. When quoting protocols, mention the Source Page Number provided by the tool.
-    4. If calculating fluids, clearly display the math and any clinical warnings.
+    4. If calculating fluids or BP, clearly display the math and any clinical warnings.
     5. Be concise, structured, and use bullet points for readability.
     """),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
 ])
-
-agent = create_tool_calling_agent(llm, tools, prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 
 # Helper function to format history for LangChain
 def get_langchain_history(messages):
@@ -140,7 +184,6 @@ if "current_chat" not in st.session_state:
     st.session_state.current_chat = "New Chat"
 if "chat_counter" not in st.session_state:
     st.session_state.chat_counter = 1
-# Used to trigger prompts from the Studio menu
 if "studio_prompt_trigger" not in st.session_state:
     st.session_state.studio_prompt_trigger = None
 
@@ -194,7 +237,6 @@ st.markdown(f"""
     
     .disclaimer-box {{ font-size: 11px; color: {text_sub}; background: {card_bg}; padding: 10px; border-radius: 8px; margin-top: 30px; text-align: center; border: 1px solid {divider_color}; }}
     
-    /* Interactive Studio Buttons Wrapper */
     .studio-btn-wrapper div[data-testid="stButton"] button {{
         width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
     }}
@@ -270,7 +312,6 @@ else:
             st.session_state.app_started = False
             st.rerun()
 
-        # Clinical Disclaimer Guardrail
         st.markdown(
             f'<div class="disclaimer-box">⚠️ <b>Clinical Disclaimer</b><br>NursBot is an AI assistant. Do not use as a substitute for clinical judgment. Always verify with official KKH Protocol Manuals.</div>', 
             unsafe_allow_html=True
@@ -284,7 +325,6 @@ else:
 
     # 3. CENTER PANE: Chat
     with chat_col:
-        # Context Breadcrumb & Studio Toggle
         c1, c2 = st.columns([4, 1])
         with c1:
             st.markdown(f"<div class='breadcrumb'>📁 KKH Workspace / Section 01 - Medical Emergencies</div>", unsafe_allow_html=True)
@@ -306,20 +346,36 @@ else:
 
         # Tools Popover
         uploaded_file = None
+        spoken_text = None
         app_mode = "Clinical Text & Docs"
         
         with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
-            app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Video Analysis", "Speech-to-Text"])
+            app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Speech-to-Text"])
+            
+            # 👉 JOESON'S CODE: UI integration to let you pick his Azure LLM
+            model_options = ["Gemini (NursBot Default)"]
+            if llm_azure: 
+                model_options.append("Azure OpenAI (Joeson's Model)")
+            selected_model = st.selectbox("Select AI Brain:", model_options)
+            
             if app_mode == "Vision (Image)":
                 uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
+                
+            # 👉 JOESON'S CODE: Speech-to-text triggering logic
+            elif app_mode == "Speech-to-Text":
+                st.markdown("<p style='font-size: 14px; font-weight: 600;'>🎤 Click to Speak:</p>", unsafe_allow_html=True)
+                spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
 
-        # Input Handling (Standard Chat Input OR Studio Trigger)
+        # Input Handling
         user_input = st.chat_input(f"Message NursBot ({app_mode})...")
         
-        # If Studio button was clicked, override the user input with the studio prompt
         if st.session_state.studio_prompt_trigger:
             user_input = st.session_state.studio_prompt_trigger
-            st.session_state.studio_prompt_trigger = None # Reset it immediately
+            st.session_state.studio_prompt_trigger = None 
+            
+        # 👉 JOESON'S CODE: Capturing microphone output as user_input
+        if app_mode == "Speech-to-Text" and spoken_text:
+            user_input = spoken_text
 
         if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
@@ -331,29 +387,32 @@ else:
         with chat_container:
             with st.chat_message("assistant"):
                 try:
-                    # Map standard history to LangChain formats
                     chat_history_lc = get_langchain_history(current_messages[:-1])
-
+                    agent_input = latest_user_input
+                    
                     if app_mode == "Vision (Image)" and uploaded_file is not None:
                         img_bytes = uploaded_file.getvalue()
                         encoded_img = base64.b64encode(img_bytes).decode("utf-8")
                         image_data = f"data:image/jpeg;base64,{encoded_img}"
                         agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
-                    else:
-                        agent_input = latest_user_input
 
-                    with st.spinner("Analyzing protocols and calculating..."):
+                    with st.spinner(f"Analyzing using {selected_model.split(' ')[0]}..."):
+                        
+                        # 👉 JOESON'S CODE: Dynamically build agent using the selected LLM
+                        active_llm = llm_azure if "Azure" in selected_model and llm_azure else llm_gemini
+                        
+                        agent = create_tool_calling_agent(active_llm, tools, prompt)
+                        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+
                         response = agent_executor.invoke({
                             "input": agent_input, 
                             "chat_history": chat_history_lc
                         })
                     
-                    # Clean up output parsing
                     raw_output = str(response.get("output", ""))
                     match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
                     full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
                     
-                    # Simulate streaming effect for better UX
                     def stream_text(text):
                         for word in text.split(" "):
                             yield word + " "
@@ -362,7 +421,6 @@ else:
                     st.write_stream(stream_text(full_response))
                     
                     st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
-                    # Force a slight pause so the UI catches up before rerunning state
                     time.sleep(0.1)
                     st.rerun()
 
