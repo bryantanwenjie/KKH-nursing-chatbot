@@ -281,9 +281,10 @@ st.markdown(f"""
         margin-top: 4px;
     }}
     .stat-divider {{
-        height: 35px;
-        width: 1px;
-        background-color: {divider_color};
+        height: 45px;
+        width: 2px;
+        background-color: {text_sub};
+        opacity: 0.25;
     }}
     /* --------------------------------- */
     
