@@ -101,19 +101,86 @@ def get_joeson_vectorstore():
     chunks = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150).split_documents(docs)
     return FAISS.from_documents(chunks, azure_embeddings)
 
-def joeson_answer_logic(question):
-    """JOESON: Calculation & RAG Logic"""
-    if "last_topic" not in st.session_state: st.session_state.last_topic = ""
-    numbers = re.findall(r"\d+\.?\d*", question)
-    if ("fluid" in question.lower() or st.session_state.last_topic == "fluid") and numbers:
-        weight = float(numbers[0])
-        daily = min(weight * 100 if weight <= 10 else 1000 + (weight-10)*50 if weight <= 20 else 1500 + (weight-20)*20, 2500)
-        st.session_state.last_topic = ""
-        return f"**Joeson's Azure Result:** Fluid requirement is {daily} ml/day."
+def calculate_fluids(weight):
+    """Joeson's Fluid Calculation Logic"""
+    weight = float(weight)
+    if weight <= 10:
+        daily = weight * 100
+        hourly = weight * 4
+    elif weight <= 20:
+        daily = 1000 + ((weight - 10) * 50)
+        hourly = 40 + ((weight - 10) * 2)
+    else:
+        daily = 1500 + ((weight - 20) * 20)
+        hourly = 60 + ((weight - 20) * 1)
     
+    daily = min(daily, 2500)
+    
+    return f"**Fluid Maintenance Calculation:**\n\nWeight: {weight} kg\n\nDaily fluid requirement: {daily:.0f} ml/day\nHourly fluid requirement: {hourly:.0f} ml/hr"
+
+def calculate_systolic_bp(age):
+    """Joeson's BP Calculation Logic"""
+    age = float(age)
+    if age < 1/12:
+        return "**Expected systolic BP:** > 60 mmHg"
+    elif age < 1:
+        return "**Expected systolic BP:** > 70 mmHg"
+    elif age <= 10:
+        sbp = 70 + (age * 2)
+        return f"**Expected systolic BP:** > {sbp:.0f} mmHg"
+    else:
+        return "This PDF formula only covers children up to 10 years old."
+
+def joeson_answer_logic(question):
+    """JOESON: Calculation & RAG Logic with Memory"""
+    question_lower = question.lower()
+
+    # Save topic memory
+    if "fluid" in question_lower or "maintenance" in question_lower:
+        st.session_state.last_topic = "fluid"
+    if "bp" in question_lower or "blood pressure" in question_lower or "systolic" in question_lower:
+        st.session_state.last_topic = "bp"
+
+    numbers = re.findall(r"\d+\.?\d*", question)
+
+    # Ask for missing information
+    if st.session_state.last_topic == "fluid" and not numbers:
+        return "Please provide patient weight in kg."
+    if st.session_state.last_topic == "bp" and not numbers:
+        return "Please provide patient age."
+
+    # Follow-up fluid calculation
+    if st.session_state.last_topic == "fluid" and numbers:
+        weight = numbers
+        st.session_state.last_topic = "" # Reset topic
+        return calculate_fluids(weight)
+
+    # Follow-up BP calculation
+    if st.session_state.last_topic == "bp" and numbers:
+        age = numbers
+        st.session_state.last_topic = "" # Reset topic
+        return calculate_systolic_bp(age)
+
+    # Original RAG retrieval
     vs = get_joeson_vectorstore()
-    context = "\n\n".join([d.page_content for d in vs.as_retriever().invoke(question)])
-    return azure_llm.invoke(f"Context: {context}\n\nQuestion: {question}").content
+    retriever = vs.as_retriever(search_kwargs={"k": 3})
+    docs = retriever.invoke(question)
+    context = "\n\n".join([doc.page_content for doc in docs])
+
+    prompt = f"""You are a nursing education assistant.
+Answer ONLY using the PDF context below.
+If the answer is not in the PDF, say: I cannot find this information in the PDF.
+
+PDF Context:
+{context}
+
+Question:
+{question}
+
+Answer:"""
+
+    return azure_llm.invoke(prompt).content
+
 
 # ==========================================
 # =========== ORIGINAL: UI & CSS ===========
@@ -123,6 +190,7 @@ if "dark_mode" not in st.session_state: st.session_state.dark_mode = True
 if "studio_expanded" not in st.session_state: st.session_state.studio_expanded = False 
 if "chat_sessions" not in st.session_state: st.session_state.chat_sessions = {"New Chat": []}
 if "current_chat" not in st.session_state: st.session_state.current_chat = "New Chat"
+if "last_topic" not in st.session_state: st.session_state.last_topic = "" # Added for Joeson's logic
 
 bg_color = "#131314" if st.session_state.dark_mode else "#FFFFFF"
 text_main = "#E3E3E3" if st.session_state.dark_mode else "#1F2937"
