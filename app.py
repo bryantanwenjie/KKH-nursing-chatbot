@@ -208,7 +208,7 @@ if st.session_state.dark_mode:
     card_bg = "#334155"   # <--- Lighter card background
     card_hover = "rgba(255,255,255,0.12)"
 else:
-    bg_color = "#FFFFFF"
+    bg_color = "#1E6BB8"
     text_main = "#1F2937"
     text_sub = "#4B5563"
     nav_color = "#4B5563"
