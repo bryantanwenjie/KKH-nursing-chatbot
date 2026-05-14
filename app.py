@@ -175,7 +175,7 @@ def get_langchain_history(messages):
 if "app_started" not in st.session_state:
     st.session_state.app_started = False
 if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = True 
+    st.session_state.dark_mode = False 
 if "studio_expanded" not in st.session_state:
     st.session_state.studio_expanded = False 
 if "chat_sessions" not in st.session_state:
@@ -200,13 +200,13 @@ def get_chat_title(chat_id, messages):
 
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    bg_color = "#131314" 
-    text_main = "#E3E3E3"
-    text_sub = "#C4C7C5"
-    nav_color = "#E3E3E3"
-    divider_color = "#444746"
-    card_bg = "#1E1F20"
-    card_hover = "rgba(255,255,255,0.08)"
+    bg_color = "#1E293B"  # <--- Softer, lighter slate/dark-gray
+    text_main = "#F8FAFC"
+    text_sub = "#CBD5E1"
+    nav_color = "#E2E8F0"
+    divider_color = "#334155"
+    card_bg = "#334155"   # <--- Lighter card background
+    card_hover = "rgba(255,255,255,0.12)"
 else:
     bg_color = "#FFFFFF"
     text_main = "#1F2937"
