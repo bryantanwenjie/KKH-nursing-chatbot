@@ -255,6 +255,38 @@ st.markdown(f"""
     
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
+    /* --- NEW: STATISTICS ROW STYLES --- */
+    .stats-container {{
+        display: flex;
+        align-items: center;
+        gap: 30px;
+        margin-top: 40px;
+        padding-top: 30px;
+        border-top: 1px solid {divider_color};
+    }}
+    .stat-item {{
+        display: flex;
+        flex-direction: column;
+    }}
+    .stat-value {{
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: {text_main};
+        line-height: 1.1;
+    }}
+    .stat-label {{
+        font-size: 0.85rem;
+        color: {text_sub};
+        font-weight: 500;
+        margin-top: 4px;
+    }}
+    .stat-divider {{
+        height: 35px;
+        width: 1px;
+        background-color: {divider_color};
+    }}
+    /* --------------------------------- */
+    
     .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
     
     .disclaimer-box {{ font-size: 11px; color: {text_sub}; background: {card_bg}; padding: 10px; border-radius: 8px; margin-top: 30px; text-align: center; border: 1px solid {divider_color}; }}
@@ -289,12 +321,34 @@ if not st.session_state.app_started:
         st.markdown('<div class="badge">✨ AI-POWERED CLINICAL ASSISTANT</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-title">Smarter Nursing<br>with <span>AI</span> Support</div>', unsafe_allow_html=True)
         st.markdown('<div class="hero-subtitle">A smart chatbot designed for nurses — access clinical protocols, perform medical calculations, and learn on the go.</div>', unsafe_allow_html=True)
+        
         btn_col1, btn_col2, _ = st.columns([1, 1, 1.5]) 
         with btn_col1:
             if st.button("Try Chatbot ➔", type="primary", use_container_width=True, key="try_btn"):
                 st.session_state.app_started = True
                 st.rerun()
-        with btn_col2: st.button("Learn More", use_container_width=True)
+        with btn_col2: 
+            st.button("Learn More", use_container_width=True)
+            
+        # --- NEW: INJECTING THE STATS ROW ---
+        st.markdown(f"""
+        <div class="stats-container">
+            <div class="stat-item">
+                <span class="stat-value">24/7</span>
+                <span class="stat-label">Available</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value">500+</span>
+                <span class="stat-label">Protocols</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-value">98%</span>
+                <span class="stat-label">Accuracy</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col2:
         try:
