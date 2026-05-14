@@ -200,21 +200,22 @@ def get_chat_title(chat_id, messages):
 
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    bg_color = "#1E293B"  # <--- Softer, lighter slate/dark-gray
+    bg_color = "#1E293B"  
     text_main = "#F8FAFC"
     text_sub = "#CBD5E1"
     nav_color = "#E2E8F0"
     divider_color = "#334155"
-    card_bg = "#334155"   # <--- Lighter card background
+    card_bg = "#334155"   
     card_hover = "rgba(255,255,255,0.12)"
 else:
-    bg_color = "#E7EAEC"
-    text_main = "#1F2937"
-    text_sub = "#4B5563"
-    nav_color = "#4B5563"
-    divider_color = "#E5E7EB"
-    card_bg = "#F9FAFB"
-    card_hover = "rgba(26, 115, 232, 0.05)"
+    # EXACT COLORS FROM YOUR IMAGE
+    bg_color = "#FAFBFC"      # Very slight off-white/gray background
+    text_main = "#1A2332"     # Deep slate for headers
+    text_sub = "#64707D"      # Muted gray for paragraphs
+    nav_color = "#64707D"     # Matching the nav links
+    divider_color = "#E2E8F0"
+    card_bg = "#FFFFFF"       # Pure white for cards/buttons
+    card_hover = "rgba(28, 100, 180, 0.05)"
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
