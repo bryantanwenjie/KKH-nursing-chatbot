@@ -208,14 +208,14 @@ if st.session_state.dark_mode:
     card_bg = "#334155"   
     card_hover = "rgba(255,255,255,0.12)"
 else:
-    # EXACT COLORS FROM YOUR IMAGE
-    bg_color = "#FAFBFC"      # Very slight off-white/gray background
-    text_main = "#1A2332"     # Deep slate for headers
-    text_sub = "#64707D"      # Muted gray for paragraphs
-    nav_color = "#64707D"     # Matching the nav links
-    divider_color = "#E2E8F0"
-    card_bg = "#FFFFFF"       # Pure white for cards/buttons
-    card_hover = "rgba(28, 100, 180, 0.05)"
+    # REVISED EXACT COLORS (Softer & Cooler)
+    bg_color = "#F4F7F9"      # Cooler, very light blue-gray background
+    text_main = "#141D2B"     # Deep navy-slate for headers
+    text_sub = "#5E6A78"      # Softer gray for subtext
+    nav_color = "#5E6A78"
+    divider_color = "#E1E7EF"
+    card_bg = "#FFFFFF"       
+    card_hover = "rgba(32, 107, 196, 0.05)"
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
@@ -223,25 +223,35 @@ st.markdown(f"""
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
-    /* MATCHING THE BLUE BUTTON */
+    /* REVISED BLUE BUTTON */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #1C64B4 !important; 
-        border-color: #1C64B4 !important; 
+        background-color: #206BC4 !important; 
+        border-color: #206BC4 !important; 
         color: white !important; 
         border-radius: 8px !important; 
         font-weight: 600;
     }}
-    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #154D8C !important; }}
+    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1A59A4 !important; }}
     
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
     
-    /* MATCHING THE LIGHT BLUE BADGE */
-    .badge {{ background-color: #E6F0FC; color: #1C64B4; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 1rem; border: 1px solid #D6E8FB; }}
+    /* REVISED LIGHT BLUE BADGE */
+    .badge {{ 
+        background-color: #EBF2FA; 
+        color: #206BC4; 
+        padding: 6px 16px; 
+        border-radius: 20px; 
+        font-size: 13px; 
+        font-weight: 700; 
+        display: inline-block; 
+        margin-bottom: 1rem; 
+        border: 1px solid #D6E4F4; 
+    }}
     
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
     
-    /* MATCHING THE TEAL 'AI' TEXT */
-    .hero-title span {{ color: #31A392; }}
+    /* REVISED TEAL 'AI' TEXT */
+    .hero-title span {{ color: #2CB09C; }}
     
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
@@ -253,7 +263,7 @@ st.markdown(f"""
         width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
     }}
     .studio-btn-wrapper div[data-testid="stButton"] button:hover {{
-        border-color: #1C64B4; background: {card_hover}; transform: translateY(-2px);
+        border-color: #206BC4; background: {card_hover}; transform: translateY(-2px);
     }}
 </style>
 """, unsafe_allow_html=True)
