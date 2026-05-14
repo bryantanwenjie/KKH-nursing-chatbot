@@ -386,7 +386,7 @@ else:
         if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
             st.rerun()
-            
+
     # Run AI Logic
     if len(current_messages) > 0 and current_messages[-1]["role"] == "user":
         latest_user_input = current_messages[-1]["content"]
@@ -402,15 +402,15 @@ else:
                         image_data = f"data:image/jpeg;base64,{encoded_img}"
                         agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
 
-                    # ---> NEW: Background logic to choose the model automatically <---
-                    if app_mode == "Speech-to-Text" and llm_azure is not None:
+                    # ---> UPDATED: Check the memory state instead of app_mode <---
+                    if st.session_state.model_choice == "Azure" and llm_azure is not None:
                         active_llm = llm_azure
                         loading_text = "Azure OpenAI (Joeson's Model)"
                     else:
                         active_llm = llm_gemini
                         loading_text = "Gemini (NursBot Default)"
 
-                    # ---> NEW: The spinner will now tell you exactly which model is running <---
+                    # The spinner will now accurately show Joeson's model
                     with st.spinner(f"Analyzing using {loading_text}..."):
                         
                         agent = create_tool_calling_agent(active_llm, tools, prompt)
@@ -438,7 +438,6 @@ else:
 
                 except Exception as e:
                     st.error(f"🚨 Error: {str(e)}")
-
 
     # 4. RIGHT PANE: Interactive Studio
     if st.session_state.studio_expanded:
