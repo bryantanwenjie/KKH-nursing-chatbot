@@ -223,15 +223,26 @@ st.markdown(f"""
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
+    /* MATCHING THE BLUE BUTTON */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #1A73E8 !important; border-color: #1A73E8 !important; color: white !important; border-radius: 8px !important; font-weight: 600;
+        background-color: #1C64B4 !important; 
+        border-color: #1C64B4 !important; 
+        color: white !important; 
+        border-radius: 8px !important; 
+        font-weight: 600;
     }}
-    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1557B0 !important; }}
+    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #154D8C !important; }}
     
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
-    .badge {{ background-color: #E8F0FE; color: #1A73E8; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 1rem; border: 1px solid #D2E3FC; }}
+    
+    /* MATCHING THE LIGHT BLUE BADGE */
+    .badge {{ background-color: #E6F0FC; color: #1C64B4; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 1rem; border: 1px solid #D6E8FB; }}
+    
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
-    .hero-title span {{ color: #0d9488; }}
+    
+    /* MATCHING THE TEAL 'AI' TEXT */
+    .hero-title span {{ color: #31A392; }}
+    
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
     .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
@@ -242,11 +253,10 @@ st.markdown(f"""
         width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
     }}
     .studio-btn-wrapper div[data-testid="stButton"] button:hover {{
-        border-color: #1A73E8; background: {card_hover}; transform: translateY(-2px);
+        border-color: #1C64B4; background: {card_hover}; transform: translateY(-2px);
     }}
 </style>
 """, unsafe_allow_html=True)
-
 
 # --- VIEW 1: LANDING PAGE ---
 if not st.session_state.app_started:
