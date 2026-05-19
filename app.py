@@ -2,8 +2,11 @@ import base64
 import os
 import re
 import time
+import json
 os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
+import hashlib
+import pyodbc
 
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -11,12 +14,13 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_community.vectorstores import FAISS
+from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, AIMessage
 
 # 👉 JOESON'S CODE: Imports for Azure and Speech-to-Text
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from streamlit_mic_recorder import speech_to_text
 
 # --- PAGE CONFIG ---
@@ -32,6 +36,89 @@ if "AZURE_OPENAI_API_KEY" in st.secrets:
     os.environ["AZURE_OPENAI_ENDPOINT"] = st.secrets["AZURE_OPENAI_ENDPOINT"]
     os.environ["AZURE_OPENAI_API_VERSION"] = st.secrets["AZURE_OPENAI_API_VERSION"]
     os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"] = st.secrets["AZURE_OPENAI_CHAT_DEPLOYMENT"]
+    if "AZURE_OPENAI_EMBEDDING_DEPLOYMENT" in st.secrets:
+        os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] = st.secrets["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"]
+
+
+# --- AZURE SQL DATABASE CONNECTION + LOGIN SYSTEM ---
+def get_db_connection():
+    server = st.secrets["AZURE_SQL_SERVER"]
+    database = st.secrets["AZURE_SQL_DATABASE"]
+    username = st.secrets["AZURE_SQL_USERNAME"]
+    password = st.secrets["AZURE_SQL_PASSWORD"]
+
+    conn = pyodbc.connect(
+        "DRIVER={ODBC Driver 18 for SQL Server};"
+        f"SERVER=tcp:{server},1433;"
+        f"DATABASE={database};"
+        f"UID={username};"
+        f"PWD={password};"
+        "Encrypt=yes;"
+        "TrustServerCertificate=no;"
+        "Connection Timeout=60;"
+    )
+    return conn
+
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
+def register_user(full_name, email, password):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        password_hash = hash_password(password)
+
+        query = """
+        INSERT INTO users (full_name, email, password_hash)
+        VALUES (?, ?, ?)
+        """
+        cursor.execute(query, (full_name, email, password_hash))
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return True, "Registration successful! Please login."
+
+    except pyodbc.IntegrityError:
+        return False, "Email already exists. Please login instead."
+    except pyodbc.Error as e:
+        return False, f"Database error: {str(e)}"
+    except Exception as e:
+        return False, f"Unexpected error: {str(e)}"
+
+
+def login_user(email, password):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        password_hash = hash_password(password)
+
+        query = """
+        SELECT user_id, full_name, email
+        FROM users
+        WHERE email = ? AND password_hash = ?
+        """
+        cursor.execute(query, (email, password_hash))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if row:
+            return True, {
+                "user_id": row[0],
+                "full_name": row[1],
+                "email": row[2]
+            }
+        return False, None
+
+    except pyodbc.Error as e:
+        st.error(f"Database error: {str(e)}")
+        return False, None
+    except Exception as e:
+        st.error(f"Unexpected error: {str(e)}")
+        return False, None
 
 # ==========================================
 # ======= BACKEND & CLINICAL LOGIC =========
@@ -167,6 +254,303 @@ def get_langchain_history(messages):
     return history
 
 
+
+# ==========================================
+# =========== QUIZ GENERATOR LOGIC ==========
+# ==========================================
+
+QUIZ_PDF_PATHS = [
+    "Section 01 - Medical Emergencies.pdf",
+    "Section_01_Medical Emergencies.pdf",
+    "Section_01_Medical_Emergencies.pdf",
+]
+
+def get_quiz_pdf_path():
+    for path in QUIZ_PDF_PATHS:
+        if os.path.exists(path):
+            return path
+    return QUIZ_PDF_PATHS[0]
+
+
+def check_quiz_env():
+    required_keys = [
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_API_VERSION",
+        "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+        "AZURE_OPENAI_CHAT_DEPLOYMENT",
+    ]
+    return [key for key in required_keys if not os.getenv(key)]
+
+
+def clean_json_response(text):
+    text = text.strip()
+    text = re.sub(r"^```json", "", text)
+    text = re.sub(r"^```", "", text)
+    text = re.sub(r"```$", "", text)
+    return text.strip()
+
+
+@st.cache_resource(show_spinner=False)
+def create_quiz_vectorstore():
+    pdf_path = get_quiz_pdf_path()
+    loader = PyPDFLoader(pdf_path)
+    documents = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200
+    )
+    chunks = splitter.split_documents(documents)
+
+    embeddings = AzureOpenAIEmbeddings(
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
+    )
+
+    return FAISS.from_documents(chunks, embeddings)
+
+
+@st.cache_resource(show_spinner=False)
+def create_quiz_llm():
+    return AzureChatOpenAI(
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        azure_deployment=os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT"),
+        temperature=0,
+    )
+
+
+def generate_quiz(vectorstore, llm, topic, number_of_questions):
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+    relevant_docs = retriever.invoke(topic)
+    context = "\n\n".join([doc.page_content for doc in relevant_docs])
+
+    quiz_prompt = PromptTemplate.from_template("""
+You are a nursing educator.
+
+Use ONLY the context below to generate a quiz.
+
+Context:
+{context}
+
+Topic:
+{topic}
+
+Generate exactly {number_of_questions} multiple-choice questions.
+
+Return ONLY valid JSON.
+Do not include markdown.
+Do not include extra text.
+
+JSON format:
+[
+  {{
+    "question": "Question text here",
+    "options": {{
+      "A": "Option A",
+      "B": "Option B",
+      "C": "Option C",
+      "D": "Option D"
+    }},
+    "correct_answer": "A",
+    "explanation": "Short explanation here"
+  }}
+]
+
+Rules:
+- Each question must have 4 options: A, B, C, D
+- correct_answer must be only A, B, C, or D
+- Use only the provided context
+- Do not invent medical facts
+- Explanation must be short and simple
+""")
+
+    final_prompt = quiz_prompt.format(
+        context=context,
+        topic=topic,
+        number_of_questions=number_of_questions
+    )
+
+    response = llm.invoke(final_prompt)
+    cleaned_response = clean_json_response(response.content)
+
+    try:
+        quiz = json.loads(cleaned_response)
+        return quiz, relevant_docs
+    except json.JSONDecodeError:
+        st.error("The AI did not return valid JSON.")
+        st.code(response.content)
+        return None, relevant_docs
+
+
+def reset_quiz():
+    st.session_state.quiz = None
+    st.session_state.quiz_answers = {}
+    st.session_state.quiz_submitted = False
+    st.session_state.quiz_relevant_docs = []
+
+
+def render_quiz_page(text_main, text_sub, card_bg, divider_color):
+    with st.sidebar:
+        st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
+
+        if st.session_state.logged_in:
+            st.success(f"Logged in as {st.session_state.user_email}")
+
+        if st.button("⬅ Back to Chatbot", use_container_width=True):
+            st.session_state.current_page = "chat"
+            st.rerun()
+
+        if st.button("Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.user_email = None
+            st.session_state.user_full_name = None
+            st.session_state.app_started = False
+            st.session_state.current_page = "chat"
+            st.rerun()
+
+        st.divider()
+        st.header("⚙️ Quiz Settings")
+
+        topic = st.text_input(
+            "Enter quiz topic",
+            placeholder="Example: infant heart rate, shock, seizures, blood pressure",
+            key="quiz_topic"
+        )
+
+        number_of_questions = st.number_input(
+            "Number of questions",
+            min_value=1,
+            max_value=10,
+            value=5,
+            step=1,
+            key="quiz_number_of_questions"
+        )
+
+        generate_button = st.button("Generate Quiz", type="primary", use_container_width=True)
+
+        if st.button("Reset Quiz", use_container_width=True):
+            reset_quiz()
+            st.rerun()
+
+    st.markdown(f"<h1 style='color:{text_main};'>📝 Nursing Quiz Generator</h1>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color:{text_sub};'>Generate multiple-choice nursing quizzes based on your Medical Emergencies PDF.</p>", unsafe_allow_html=True)
+
+    missing_keys = check_quiz_env()
+    if missing_keys:
+        st.error("Missing Azure OpenAI environment variables / secrets:")
+        for key in missing_keys:
+            st.code(key)
+        st.info("Add the missing keys into `.streamlit/secrets.toml`, then restart Streamlit.")
+        st.stop()
+
+    pdf_path = get_quiz_pdf_path()
+    if not os.path.exists(pdf_path):
+        st.error(f"PDF file not found: {pdf_path}")
+        st.warning("Put your Medical Emergencies PDF in the same folder as your Streamlit app.")
+        st.stop()
+
+    if "quiz" not in st.session_state:
+        st.session_state.quiz = None
+    if "quiz_answers" not in st.session_state:
+        st.session_state.quiz_answers = {}
+    if "quiz_submitted" not in st.session_state:
+        st.session_state.quiz_submitted = False
+    if "quiz_relevant_docs" not in st.session_state:
+        st.session_state.quiz_relevant_docs = []
+
+    try:
+        with st.spinner("Loading quiz vector database..."):
+            vectorstore = create_quiz_vectorstore()
+        with st.spinner("Loading Azure OpenAI quiz model..."):
+            quiz_llm = create_quiz_llm()
+    except Exception as e:
+        st.error("Error while loading quiz generator.")
+        st.code(str(e))
+        st.stop()
+
+    if generate_button:
+        if not topic.strip():
+            st.warning("Please enter a quiz topic first.")
+        else:
+            reset_quiz()
+            with st.spinner("Generating quiz..."):
+                quiz, relevant_docs = generate_quiz(
+                    vectorstore,
+                    quiz_llm,
+                    topic,
+                    number_of_questions
+                )
+
+            if quiz:
+                st.session_state.quiz = quiz
+                st.session_state.quiz_relevant_docs = relevant_docs
+                st.success("Quiz generated successfully!")
+
+    if st.session_state.quiz:
+        st.subheader("📝 Quiz")
+
+        for i, q in enumerate(st.session_state.quiz):
+            st.markdown(f"### Question {i + 1}")
+            st.write(q["question"])
+
+            options = q["options"]
+
+            selected_answer = st.radio(
+                label="Choose your answer:",
+                options=list(options.keys()),
+                format_func=lambda x: f"{x}. {options[x]}",
+                key=f"quiz_question_{i}",
+                disabled=st.session_state.quiz_submitted
+            )
+
+            st.session_state.quiz_answers[i] = selected_answer
+
+            if st.session_state.quiz_submitted:
+                correct_answer = q["correct_answer"].strip().upper()
+
+                if selected_answer == correct_answer:
+                    st.success("Correct!")
+                else:
+                    st.error(f"Wrong. Correct answer: {correct_answer}")
+
+                st.info(f"Explanation: {q['explanation']}")
+
+            st.divider()
+
+        if not st.session_state.quiz_submitted:
+            if st.button("Submit Answers", type="primary"):
+                st.session_state.quiz_submitted = True
+                st.rerun()
+        else:
+            score = 0
+            for i, q in enumerate(st.session_state.quiz):
+                correct_answer = q["correct_answer"].strip().upper()
+                user_answer = st.session_state.quiz_answers.get(i)
+                if user_answer == correct_answer:
+                    score += 1
+
+            st.subheader(f"Final Score: {score}/{len(st.session_state.quiz)}")
+
+            if score == len(st.session_state.quiz):
+                st.success("Excellent! You got all questions correct.")
+            elif score >= len(st.session_state.quiz) / 2:
+                st.warning("Good try! Review the explanations to improve.")
+            else:
+                st.error("Keep practising. Review the PDF content again.")
+
+    if st.session_state.quiz_relevant_docs:
+        with st.expander("View retrieved PDF sources"):
+            for i, doc in enumerate(st.session_state.quiz_relevant_docs, start=1):
+                page = doc.metadata.get("page", "Unknown")
+                st.markdown(f"#### Source {i} | Page {page}")
+                st.write(doc.page_content[:1000])
+
+
 # ==========================================
 # =========== FRONTEND UI ==================
 # ==========================================
@@ -186,6 +570,20 @@ if "chat_counter" not in st.session_state:
     st.session_state.chat_counter = 1
 if "studio_prompt_trigger" not in st.session_state:
     st.session_state.studio_prompt_trigger = None
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "chat"
+
+# --- LOGIN SESSION STATES ---
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user_email" not in st.session_state:
+    st.session_state.user_email = None
+if "user_full_name" not in st.session_state:
+    st.session_state.user_full_name = None
+if "show_login_popup" not in st.session_state:
+    st.session_state.show_login_popup = False
+if "show_register_popup" not in st.session_state:
+    st.session_state.show_register_popup = False
 
 def toggle_theme():
     st.session_state.dark_mode = not st.session_state.dark_mode
@@ -197,6 +595,73 @@ def get_chat_title(chat_id, messages):
         if m["role"] == "user":
             return m["content"][:20] + "..."
     return chat_id
+
+
+@st.dialog("Login to NursBot")
+def login_popup():
+    st.markdown("### Welcome back 👋")
+
+    email = st.text_input("Email", key="login_email")
+    password = st.text_input("Password", type="password", key="login_password")
+
+    login_col, register_col = st.columns(2)
+
+    with login_col:
+        if st.button("Login", type="primary", use_container_width=True):
+            if not email or not password:
+                st.error("Please enter your email and password.")
+            else:
+                success, user = login_user(email, password)
+
+                if success:
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = user["email"]
+                    st.session_state.user_full_name = user["full_name"]
+                    st.session_state.app_started = True
+                    st.session_state.current_page = "chat"
+                    st.session_state.show_login_popup = False
+                    st.session_state.show_register_popup = False
+                    st.success("Login successful!")
+                    st.rerun()
+                else:
+                    st.error("Invalid email or password.")
+
+    with register_col:
+        if st.button("Register", use_container_width=True):
+            st.session_state.show_login_popup = False
+            st.session_state.show_register_popup = True
+            st.rerun()
+
+
+@st.dialog("Register New Account")
+def register_popup():
+    st.markdown("### Create your NursBot account")
+
+    full_name = st.text_input("Full Name", key="register_full_name")
+    email = st.text_input("Email", key="register_email")
+    password = st.text_input("Password", type="password", key="register_password")
+    confirm_password = st.text_input("Confirm Password", type="password", key="register_confirm_password")
+
+    if st.button("Create Account", type="primary", use_container_width=True):
+        if not full_name or not email or not password or not confirm_password:
+            st.error("Please fill in all fields.")
+        elif password != confirm_password:
+            st.error("Passwords do not match.")
+        else:
+            success, message = register_user(full_name, email, password)
+
+            if success:
+                st.success(message)
+                st.session_state.show_register_popup = False
+                st.session_state.show_login_popup = True
+                st.rerun()
+            else:
+                st.error(message)
+
+    if st.button("Back to Login", use_container_width=True):
+        st.session_state.show_register_popup = False
+        st.session_state.show_login_popup = True
+        st.rerun()
 
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
@@ -301,6 +766,13 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+# --- POPUP TRIGGERS ---
+# Only open one dialog at a time to avoid Streamlit dialog errors.
+if st.session_state.show_login_popup:
+    login_popup()
+elif st.session_state.show_register_popup:
+    register_popup()
+
 # --- VIEW 1: LANDING PAGE ---
 if not st.session_state.app_started:
     nav1, nav2, nav3, nav4 = st.columns([1.5, 4, 0.5, 1], gap="small")
@@ -311,7 +783,10 @@ if not st.session_state.app_started:
         st.button(icon, on_click=toggle_theme, key="theme_btn")
     with nav4:
         if st.button("Get Started", type="primary", use_container_width=True):
-            st.session_state.app_started = True
+            if st.session_state.logged_in:
+                st.session_state.app_started = True
+            else:
+                st.session_state.show_login_popup = True
             st.rerun()
             
     st.divider() 
@@ -326,7 +801,10 @@ if not st.session_state.app_started:
         btn_col1, btn_col2, _ = st.columns([1, 1, 1.5]) 
         with btn_col1:
             if st.button("Try Chatbot ➔", type="primary", use_container_width=True, key="try_btn"):
-                st.session_state.app_started = True
+                if st.session_state.logged_in:
+                    st.session_state.app_started = True
+                else:
+                    st.session_state.show_login_popup = True
                 st.rerun()
         with btn_col2: 
             st.button("Learn More", use_container_width=True)
@@ -360,6 +838,10 @@ if not st.session_state.app_started:
 
 # --- VIEW 2: APP CHAT INTERFACE ---
 else:
+    if st.session_state.current_page == "quiz":
+        render_quiz_page(text_main, text_sub, card_bg, divider_color)
+        st.stop()
+
     current_messages = st.session_state.chat_sessions[st.session_state.current_chat]
 
     # 1. LEFT PANE: Sidebar History & Safety
@@ -372,6 +854,16 @@ else:
             st.success("✅ Azure is Loaded")
 
         st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
+
+        if st.session_state.logged_in:
+            st.success(f"Logged in as {st.session_state.user_email}")
+
+        if st.button("Logout", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.user_email = None
+            st.session_state.user_full_name = None
+            st.session_state.app_started = False
+            st.rerun()
         
         if st.button("➕ New chat", type="primary", use_container_width=True):
             st.session_state.chat_counter += 1
@@ -433,7 +925,7 @@ else:
         app_mode = "Clinical Text & Docs"
         
         with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
-            app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Speech-to-Text"])
+            app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Speech-to-Text", "Quiz Generator"])
             
             # ---> DELETED THE "Select AI Brain" DROPDOWN <---
             
@@ -443,6 +935,12 @@ else:
             elif app_mode == "Speech-to-Text":
                 st.markdown("<p style='font-size: 14px; font-weight: 600;'>🎤 Click to Speak:</p>", unsafe_allow_html=True)
                 spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
+
+            elif app_mode == "Quiz Generator":
+                st.info("Open the full quiz page to generate and answer MCQ questions.")
+                if st.button("Open Quiz Generator", type="primary", use_container_width=True):
+                    st.session_state.current_page = "quiz"
+                    st.rerun()
 
         # --- State to remember the model choice across reruns ---
         if "model_choice" not in st.session_state:
