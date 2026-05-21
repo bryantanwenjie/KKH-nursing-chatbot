@@ -16,3 +16,6 @@ sentence-transformers
 streamlit-mic-recorder    # Required for Speech-to-Text
 langchain-openai           # Required for Azure OpenAI integration
 faiss-cpu                  # Required for Joeson's Vector Store
+
+# --- CHEE YOU'S REQUIREMENTS ---
+pyodbc
