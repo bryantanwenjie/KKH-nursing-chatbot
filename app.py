@@ -30,34 +30,22 @@ st.set_page_config(page_title="NursBot | Clinical AI", page_icon="🏥", layout=
 if "GOOGLE_API_KEY" in st.secrets:
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
 
-# --- DYNAMIC CREDENTIAL ROUTING ---
-# We use st.session_state.model_choice to dynamically switch variables in os.environ
-if "model_choice" not in st.session_state:
-    st.session_state.model_choice = "Gemini"
-
-# Default fallback environment setups to prevent crashing
-if st.session_state.model_choice == "Azure" and "joeson" in st.secrets:
-    os.environ["AZURE_OPENAI_API_KEY"] = st.secrets["joeson"]["AZURE_OPENAI_API_KEY"]
-    os.environ["AZURE_OPENAI_ENDPOINT"] = st.secrets["joeson"]["AZURE_OPENAI_ENDPOINT"]
-    os.environ["AZURE_OPENAI_API_VERSION"] = st.secrets["joeson"]["AZURE_OPENAI_API_VERSION"]
-    os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"] = st.secrets["joeson"]["AZURE_OPENAI_CHAT_DEPLOYMENT"]
-    os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] = st.secrets["joeson"]["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"]
-elif "chee_you" in st.secrets:
-    # Default backend initialization environment setup (Using Chee You's keys as default base)
-    os.environ["AZURE_OPENAI_API_KEY"] = st.secrets["chee_you"]["AZURE_OPENAI_API_KEY"]
-    os.environ["AZURE_OPENAI_ENDPOINT"] = st.secrets["chee_you"]["AZURE_OPENAI_ENDPOINT"]
-    os.environ["AZURE_OPENAI_API_VERSION"] = st.secrets["chee_you"]["AZURE_OPENAI_API_VERSION"]
-    os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"] = st.secrets["chee_you"]["AZURE_OPENAI_CHAT_DEPLOYMENT"]
-    os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] = st.secrets["chee_you"]["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"]
+# 👉 JOESON'S CODE: Azure Authentication setup
+if "AZURE_OPENAI_API_KEY" in st.secrets:
+    os.environ["AZURE_OPENAI_API_KEY"] = st.secrets["AZURE_OPENAI_API_KEY"]
+    os.environ["AZURE_OPENAI_ENDPOINT"] = st.secrets["AZURE_OPENAI_ENDPOINT"]
+    os.environ["AZURE_OPENAI_API_VERSION"] = st.secrets["AZURE_OPENAI_API_VERSION"]
+    os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"] = st.secrets["AZURE_OPENAI_CHAT_DEPLOYMENT"]
+    if "AZURE_OPENAI_EMBEDDING_DEPLOYMENT" in st.secrets:
+        os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] = st.secrets["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"]
 
 
 # --- AZURE SQL DATABASE CONNECTION + LOGIN SYSTEM ---
 def get_db_connection():
-    # FIXED: Now routing parameters accurately through the [chee_you] secrets section
-    server = st.secrets["chee_you"]["AZURE_SQL_SERVER"]
-    database = st.secrets["chee_you"]["AZURE_SQL_DATABASE"]
-    username = st.secrets["chee_you"]["AZURE_SQL_USERNAME"]
-    password = st.secrets["chee_you"]["AZURE_SQL_PASSWORD"]
+    server = st.secrets["AZURE_SQL_SERVER"]
+    database = st.secrets["AZURE_SQL_DATABASE"]
+    username = st.secrets["AZURE_SQL_USERNAME"]
+    password = st.secrets["AZURE_SQL_PASSWORD"]
 
     conn = pyodbc.connect(
         "DRIVER={ODBC Driver 18 for SQL Server};"
@@ -119,11 +107,11 @@ def login_user(email, password):
 
         if row:
             return True, {
-                "user_id": row,
-                "full_name": row,
-                "email": row
+                "user_id": row[0],
+                "full_name": row[1],
+                "email": row[2]
             }
-            return False, None
+        return False, None
 
     except pyodbc.Error as e:
         st.error(f"Database error: {str(e)}")
@@ -228,18 +216,15 @@ tools = [calculate_fluid_requirement, search_nursing_protocols, calculate_systol
 # Initialize Your Google Model
 llm_gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
 
-# 👉 JOESON'S CODE REFACTORED: Initialize Azure Chat Model pulling parameters from the joeson sub-group
+# 👉 JOESON'S CODE: Initialize his Azure Model
 try:
-    if "joeson" in st.secrets:
-        llm_azure = AzureChatOpenAI(
-            azure_endpoint=st.secrets["joeson"]["AZURE_OPENAI_ENDPOINT"],
-            api_key=st.secrets["joeson"]["AZURE_OPENAI_API_KEY"],
-            api_version=st.secrets["joeson"]["AZURE_OPENAI_API_VERSION"],
-            azure_deployment=st.secrets["joeson"]["AZURE_OPENAI_CHAT_DEPLOYMENT"],
-            temperature=0
-        )
-    else:
-        llm_azure = None
+    llm_azure = AzureChatOpenAI(
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION", ""),
+        azure_deployment=os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", ""),
+        temperature=0
+    )
 except:
     llm_azure = None
 
@@ -269,6 +254,7 @@ def get_langchain_history(messages):
     return history
 
 
+
 # ==========================================
 # =========== QUIZ GENERATOR LOGIC ==========
 # ==========================================
@@ -283,14 +269,10 @@ def get_quiz_pdf_path():
     for path in QUIZ_PDF_PATHS:
         if os.path.exists(path):
             return path
-    return QUIZ_PDF_PATHS
+    return QUIZ_PDF_PATHS[0]
 
 
 def check_quiz_env():
-    # UPDATED: Validation targeting Chee You's parameters (or your preferred defaults)
-    if "chee_you" not in st.secrets:
-        return ["chee_you_secrets_block_missing"]
-    
     required_keys = [
         "AZURE_OPENAI_ENDPOINT",
         "AZURE_OPENAI_API_KEY",
@@ -298,7 +280,7 @@ def check_quiz_env():
         "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
         "AZURE_OPENAI_CHAT_DEPLOYMENT",
     ]
-    return [key for key in required_keys if key not in st.secrets["chee_you"]]
+    return [key for key in required_keys if not os.getenv(key)]
 
 
 def clean_json_response(text):
@@ -321,12 +303,11 @@ def create_quiz_vectorstore():
     )
     chunks = splitter.split_documents(documents)
 
-    # REFACTORED: Utilizing Chee You's Azure endpoints specifically for the Quiz generator
     embeddings = AzureOpenAIEmbeddings(
-        azure_endpoint=st.secrets["chee_you"]["AZURE_OPENAI_ENDPOINT"],
-        api_key=st.secrets["chee_you"]["AZURE_OPENAI_API_KEY"],
-        api_version=st.secrets["chee_you"]["AZURE_OPENAI_API_VERSION"],
-        azure_deployment=st.secrets["chee_you"]["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
     )
 
     return FAISS.from_documents(chunks, embeddings)
@@ -334,12 +315,11 @@ def create_quiz_vectorstore():
 
 @st.cache_resource(show_spinner=False)
 def create_quiz_llm():
-    # REFACTORED: Utilizing Chee You's parameters specifically for the Quiz LLM engine
     return AzureChatOpenAI(
-        azure_endpoint=st.secrets["chee_you"]["AZURE_OPENAI_ENDPOINT"],
-        api_key=st.secrets["chee_you"]["AZURE_OPENAI_API_KEY"],
-        api_version=st.secrets["chee_you"]["AZURE_OPENAI_API_VERSION"],
-        azure_deployment=st.secrets["chee_you"]["AZURE_OPENAI_CHAT_DEPLOYMENT"],
+        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
+        azure_deployment=os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT"),
         temperature=0,
     )
 
@@ -462,10 +442,10 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
 
     missing_keys = check_quiz_env()
     if missing_keys:
-        st.error("Missing Azure OpenAI environment variables in your chee_you secrets group:")
+        st.error("Missing Azure OpenAI environment variables / secrets:")
         for key in missing_keys:
             st.code(key)
-        st.info("Add the missing keys inside the [chee_you] block in your Streamlit secrets tab.")
+        st.info("Add the missing keys into `.streamlit/secrets.toml`, then restart Streamlit.")
         st.stop()
 
     pdf_path = get_quiz_pdf_path()
@@ -693,9 +673,10 @@ if st.session_state.dark_mode:
     card_bg = "#334155"   
     card_hover = "rgba(255,255,255,0.12)"
 else:
-    bg_color = "#E7EFF5"      
-    text_main = "#141D2B"     
-    text_sub = "#5E6A78"      
+    # REVISED EXACT COLORS (Softer & Cooler)
+    bg_color = "#E7EFF5"      # Cooler, very light blue-gray background
+    text_main = "#141D2B"     # Deep navy-slate for headers
+    text_sub = "#5E6A78"      # Softer gray for subtext
     nav_color = "#5E6A78"
     divider_color = "#E1E7EF"
     card_bg = "#FFFFFF"       
@@ -707,6 +688,7 @@ st.markdown(f"""
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
+    /* REVISED BLUE BUTTON */
     div[data-testid="stButton"] button[kind="primary"] {{
         background-color: #206BC4 !important; 
         border-color: #206BC4 !important; 
@@ -718,6 +700,7 @@ st.markdown(f"""
     
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
     
+    /* REVISED LIGHT BLUE BADGE */
     .badge {{ 
         background-color: #EBF2FA; 
         color: #206BC4; 
@@ -731,9 +714,13 @@ st.markdown(f"""
     }}
     
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
+    
+    /* REVISED TEAL 'AI' TEXT */
     .hero-title span {{ color: #2CB09C; }}
+    
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
+    /* --- NEW: STATISTICS ROW STYLES --- */
     .stats-container {{
         display: flex;
         align-items: center;
@@ -764,8 +751,10 @@ st.markdown(f"""
         background-color: {text_sub};
         opacity: 0.25;
     }}
+    /* --------------------------------- */
     
     .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
+    
     .disclaimer-box {{ font-size: 11px; color: {text_sub}; background: {card_bg}; padding: 10px; border-radius: 8px; margin-top: 30px; text-align: center; border: 1px solid {divider_color}; }}
     
     .studio-btn-wrapper div[data-testid="stButton"] button {{
@@ -777,6 +766,8 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+# --- POPUP TRIGGERS ---
+# Only open one dialog at a time to avoid Streamlit dialog errors.
 if st.session_state.show_login_popup:
     login_popup()
 elif st.session_state.show_register_popup:
@@ -818,6 +809,7 @@ if not st.session_state.app_started:
         with btn_col2: 
             st.button("Learn More", use_container_width=True)
             
+        # --- NEW: INJECTING THE STATS ROW ---
         st.markdown(f"""
         <div class="stats-container">
             <div class="stat-item">
@@ -902,13 +894,13 @@ else:
 
     # 2. MAIN LAYOUT
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns(, gap="large")
+        chat_col, studio_col = st.columns([3, 1], gap="large")
     else:
         chat_col = st.container()
 
     # 3. CENTER PANE: Chat
     with chat_col:
-        c1, c2 = st.columns()
+        c1, c2 = st.columns([4, 1])
         with c1:
             st.markdown(f"<div class='breadcrumb'>📁 KKH Workspace / Section 01 - Medical Emergencies</div>", unsafe_allow_html=True)
         with c2:
@@ -935,6 +927,8 @@ else:
         with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
             app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Speech-to-Text", "Quiz Generator"])
             
+            # ---> DELETED THE "Select AI Brain" DROPDOWN <---
+            
             if app_mode == "Vision (Image)":
                 uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
                 
@@ -948,20 +942,27 @@ else:
                     st.session_state.current_page = "quiz"
                     st.rerun()
 
+        # --- State to remember the model choice across reruns ---
+        if "model_choice" not in st.session_state:
+            st.session_state.model_choice = "Gemini"
+
         # Input Handling
         user_input = st.chat_input(f"Message NursBot ({app_mode})...")
         
+        # 1. Did the user use a Studio button?
         if st.session_state.studio_prompt_trigger:
             user_input = st.session_state.studio_prompt_trigger
             st.session_state.studio_prompt_trigger = None 
             st.session_state.model_choice = "Gemini" 
             
+        # 2. Did the user use Speech-to-Text?
         elif spoken_text:
             user_input = spoken_text
-            st.session_state.model_choice = "Azure" 
+            st.session_state.model_choice = "Azure" # Lock in Azure
             
+        # 3. Did the user type normally?
         elif user_input:
-            st.session_state.model_choice = "Gemini" 
+            st.session_state.model_choice = "Gemini" # Lock in Gemini
 
         if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
@@ -982,7 +983,7 @@ else:
                         image_data = f"data:image/jpeg;base64,{encoded_img}"
                         agent_input = [HumanMessage(content=[{"type": "text", "text": latest_user_input}, {"type": "image_url", "image_url": {"url": image_data}}])]
 
-                    # Setup dynamic system variables inside processing scope 
+                    # ---> UPDATED: Check the memory state instead of app_mode <---
                     if st.session_state.model_choice == "Azure" and llm_azure is not None:
                         active_llm = llm_azure
                         loading_text = "Azure OpenAI (Joeson's Model)"
@@ -990,6 +991,7 @@ else:
                         active_llm = llm_gemini
                         loading_text = "Gemini (NursBot Default)"
 
+                    # The spinner will now accurately show Joeson's model
                     with st.spinner(f"Analyzing using {loading_text}..."):
                         
                         agent = create_tool_calling_agent(active_llm, tools, prompt)
