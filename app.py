@@ -209,8 +209,59 @@ def calculate_systolic_bp(age_years: float) -> str:
     else:
         return "Warning: This formula only covers children up to 10 years old."
 
-# 👉 JOESON'S CODE: Added his BP tool to your tools list
-tools = [calculate_fluid_requirement, search_nursing_protocols, calculate_systolic_bp]
+@tool
+def calculate_parkland_burn_fluid(weight_kg: float, burn_percentage: float) -> str:
+    """Calculates Parkland formula fluid replacement for 2nd/3rd degree burns."""
+    # Calculates the 3 to 4 ml/kg range per % BSA burn
+    vol_min = 3 * weight_kg * burn_percentage
+    vol_max = 4 * weight_kg * burn_percentage
+    
+    half_min = vol_min / 2
+    half_max = vol_max / 2
+    
+    return (
+        f"Total 24-hour volume: {vol_min:.0f} - {vol_max:.0f} mL.\n"
+        f"1st 8 hours: Give {half_min:.0f} - {half_max:.0f} mL.\n"
+        f"Next 16 hours: Give remaining {half_min:.0f} - {half_max:.0f} mL."
+    )
+
+@tool
+def expected_urine_output(weight_kg: float, is_neonate: bool) -> str:
+    """Calculates the expected minimum urine output per hour."""
+    if is_neonate:
+        expected = 0.5 * weight_kg
+        return f"For a neonate ({weight_kg} kg), normal expected urine output is > {expected:.1f} mL/hr."
+    else:
+        expected = 1.0 * weight_kg
+        return f"For an infant or older child ({weight_kg} kg), normal expected urine output is > {expected:.1f} mL/hr."
+
+@tool
+def check_vitals_ranges(age_years: float) -> str:
+    """Returns the normal Heart Rate and Respiratory Rate ranges based on pediatric age."""
+    if age_years < 0.25: # Birth to <3 months
+        return "Heart Rate: 90 - 180 bpm | Respiratory Rate: 30 - 60 breaths/min"
+    elif age_years < 0.5: # 3 months to <6 months
+        return "Heart Rate: 80 - 160 bpm | Respiratory Rate: 30 - 60 breaths/min"
+    elif age_years < 1.0: # 6 months to <1 year
+        return "Heart Rate: 80 - 140 bpm | Respiratory Rate: 25 - 45 breaths/min"
+    elif age_years < 6.0:
+        return "Heart Rate: 75 - 130 bpm | Respiratory Rate: 20 - 30 breaths/min"
+    elif age_years < 10.0:
+        return "Heart Rate: 70 - 110 bpm | Respiratory Rate: 16 - 24 breaths/min"
+    elif age_years < 15.0:
+        return "Heart Rate: 60 - 90 bpm | Respiratory Rate: 14 - 20 breaths/min"
+    else:
+        return "Heart Rate: 60 - 90 bpm | Respiratory Rate: 12 - 16 breaths/min"
+
+# Tools list
+tools = [
+    calculate_fluid_requirement, 
+    search_nursing_protocols, 
+    calculate_systolic_bp,
+    calculate_parkland_burn_fluid,
+    expected_urine_output,
+    check_vitals_ranges
+]
 
 # Initialize Your Google Model
 llm_gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
@@ -251,8 +302,6 @@ def get_langchain_history(messages):
         else:
             history.append(AIMessage(content=m["content"]))
     return history
-
-
 
 # ==========================================
 # =========== QUIZ GENERATOR LOGIC ==========
