@@ -39,7 +39,6 @@ if "AZURE_OPENAI_API_KEY" in st.secrets:
     if "AZURE_OPENAI_EMBEDDING_DEPLOYMENT" in st.secrets:
         os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"] = st.secrets["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"]
 
-
 # --- AZURE SQL DATABASE CONNECTION + LOGIN SYSTEM ---
 def get_db_connection():
     server = st.secrets["AZURE_SQL_SERVER"]
@@ -48,7 +47,7 @@ def get_db_connection():
     password = st.secrets["AZURE_SQL_PASSWORD"]
 
     conn = pyodbc.connect(
-        "DRIVER={ODBC Driver 18 for SQL Server};"
+        "DRIVER={ODBC Driver 17 for SQL Server};"  # <-- CHANGED THIS FROM 18 TO 17
         f"SERVER=tcp:{server},1433;"
         f"DATABASE={database};"
         f"UID={username};"

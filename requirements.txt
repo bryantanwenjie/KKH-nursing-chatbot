@@ -18,5 +18,4 @@ langchain-openai           # Required for Azure OpenAI integration
 faiss-cpu                  # Required for Joeson's Vector Store
 
 # --- CHEE YOU'S REQUIREMENTS ---
-streamlit
 pyodbc
