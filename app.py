@@ -928,8 +928,16 @@ else:
             
             # ---> DELETED THE "Select AI Brain" DROPDOWN <---
             
-            if app_mode == "Vision (Image)":
-                uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
+            if app_mode == "Vision (Image)" and uploaded_file is not None:
+                        img_bytes = uploaded_file.getvalue()
+                        encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                        image_data = f"data:image/jpeg;base64,{encoded_img}"
+                        
+                        # CORRECTED: Just pass the list of content blocks, do NOT wrap it in HumanMessage()
+                        agent_input = [
+                            {"type": "text", "text": latest_user_input}, 
+                            {"type": "image_url", "image_url": {"url": image_data}}
+                        ]
                 
             elif app_mode == "Speech-to-Text":
                 st.markdown("<p style='font-size: 14px; font-weight: 600;'>🎤 Click to Speak:</p>", unsafe_allow_html=True)
