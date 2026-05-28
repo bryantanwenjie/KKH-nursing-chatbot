@@ -772,38 +772,38 @@ st.markdown(f"""
         opacity: 1 !important;
     }}
 
-    /* 3. 👉 PRIMARY BUTTONS (Vibrant Blue) 👈 */
+    /* 3. 👉 PRIMARY BUTTONS (Base44 Solid Blue) 👈 */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #3B82F6 !important; 
-        border-color: #3B82F6 !important; 
+        background-color: #1D68BD !important; 
+        border-color: #1D68BD !important; 
         color: white !important; 
         border-radius: 8px !important; 
         font-weight: 600;
     }}
     div[data-testid="stButton"] button[kind="primary"]:hover {{ 
-        background-color: #2563EB !important; 
+        background-color: #15529A !important; 
     }}
 
-    /* 4. 👉 SECONDARY BUTTONS & POPOVERS (Matching the "Learn More" style) 👈 */
+    /* 4. 👉 SECONDARY BUTTONS & POPOVERS (White Cards for Base44 Depth) 👈 */
     div[data-testid="stButton"] button[kind="secondary"],
-    div[data-testid="stPopover"] button {
-        background-color: #FFFFFF !important; /* Forces the button to be pure white */
+    div[data-testid="stPopover"] button {{
+        background-color: {card_bg} !important;
         color: {text_main} !important; 
         border: 1px solid {divider_color} !important; 
         border-radius: 8px !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important; /* Adds a microscopic shadow for depth */
-    }
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    }}
     div[data-testid="stButton"] button[kind="secondary"]:hover,
-    div[data-testid="stPopover"] button:hover {
+    div[data-testid="stPopover"] button:hover {{
         border-color: #1D68BD !important;
         color: #1D68BD !important;
-        background-color: #F8FAFC !important;
-    }
+        background-color: rgba(29, 104, 189, 0.05) !important;
+    }}
 
-    /* 5. 👉 HIGH-CONTRAST ALERTS (Forcing Streamlit's colors out) 👈 */
+    /* 5. 👉 HIGH-CONTRAST ALERTS 👈 */
     [data-testid="stAlert"] {{
-        background-color: #1E293B !important; 
-        border: 1px solid #475569 !important;
+        background-color: {card_bg} !important; 
+        border: 1px solid {divider_color} !important;
         border-radius: 8px !important;
     }}
     [data-testid="stAlert"] > div {{
@@ -811,10 +811,10 @@ st.markdown(f"""
     }}
     [data-testid="stAlert"] p, 
     [data-testid="stAlert"] span {{
-        color: #F8FAFC !important;
+        color: {text_main} !important;
     }}
     [data-testid="stAlert"] a {{
-        color: #38BDF8 !important; 
+        color: #1D68BD !important; 
         font-weight: 600 !important;
         text-decoration: none !important;
     }}
@@ -827,7 +827,7 @@ st.markdown(f"""
     
     .badge {{ 
         background-color: #EBF2FA; 
-        color: #206BC4; 
+        color: #1D68BD; 
         padding: 6px 16px; 
         border-radius: 20px; 
         font-size: 13px; 
@@ -838,7 +838,7 @@ st.markdown(f"""
     }}
     
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
-    .hero-title span {{ color: #3B82F6; }} 
+    .hero-title span {{ color: #2CB09C; }} 
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
     /* 7. Stats Container */
@@ -848,14 +848,14 @@ st.markdown(f"""
     .stat-item {{ display: flex; flex-direction: column; }}
     .stat-value {{ font-size: 1.8rem; font-weight: 800; color: {text_main}; line-height: 1.1; }}
     .stat-label {{ font-size: 0.85rem; color: {text_sub}; font-weight: 500; margin-top: 4px; }}
-    .stat-divider {{ height: 45px; width: 2px; background-color: {text_sub}; opacity: 0.25; }}
+    .stat-divider {{ height: 45px; width: 2px; background-color: {divider_color}; opacity: 0.5; }}
     
     /* 8. Chat UI Elements */
     .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
     
     /* 9. 👉 CUSTOM DISCLAIMER BOX 👈 */
     .disclaimer-box {{ 
-        background-color: rgba(15, 23, 42, 0.6); 
+        background-color: {card_bg}; 
         border: 1px solid {divider_color};
         border-left: 3px solid #F59E0B; 
         padding: 15px; 
@@ -871,7 +871,7 @@ st.markdown(f"""
         width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
     }}
     .studio-btn-wrapper div[data-testid="stButton"] button:hover {{
-        border-color: #3B82F6; background: {card_hover}; transform: translateY(-2px);
+        border-color: #1D68BD; background: {card_hover}; transform: translateY(-2px);
     }}
 </style>
 """, unsafe_allow_html=True)
