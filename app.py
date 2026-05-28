@@ -738,7 +738,6 @@ def register_popup():
         st.rerun()
 
 # --- DYNAMIC THEME COLORS ---
-# --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
     # 🌙 PREMIUM DARK MODE (Base44 Style)
     bg_color = "#0B1120"       # Ultra-deep navy background
@@ -774,6 +773,7 @@ else:
     primary_hover = "#15529A"
     sec_btn_border = "#E2E8F0"
 
+# --- CUSTOM CSS ---
 # --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
@@ -896,6 +896,17 @@ st.markdown(f"""
         border-radius: 24px !important; 
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02) !important; 
         border: 1px solid {divider_color} !important; 
+    }}
+
+    /* 11. 👉 FIX CHAT BUBBLES (Text Visibility & Clean Background) 👈 */
+    [data-testid="stChatMessage"] {{
+        background-color: transparent !important; 
+    }}
+    [data-testid="stChatMessageContent"] p,
+    [data-testid="stChatMessageContent"] li,
+    [data-testid="stChatMessageContent"] a,
+    [data-testid="stChatMessageContent"] span {{
+        color: {text_main} !important; 
     }}
 </style>
 """, unsafe_allow_html=True)
