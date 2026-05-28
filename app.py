@@ -739,13 +739,14 @@ def register_popup():
 
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    bg_color = "#1E293B"  
-    text_main = "#F8FAFC"
-    text_sub = "#CBD5E1"
+    # 🌙 MATCHING YOUR NEW SLEEK DARK REFERENCE
+    bg_color = "#0F172A"      # Very deep slate/navy for the main background
+    text_main = "#FFFFFF"     # Pure white for high contrast
+    text_sub = "#94A3B8"      # Soft silver/gray for subtext
     nav_color = "#E2E8F0"
-    divider_color = "#F8FAFC"
-    card_bg = "#334155"   
-    card_hover = "rgba(255,255,255,0.12)"
+    divider_color = "#1E293B" # Subtle dark borders
+    card_bg = "#1E293B"       # Slightly lighter slate for the sidebar/alerts
+    card_hover = "rgba(59, 130, 246, 0.1)" # A subtle blue hover effect
 else:
     # REVISED EXACT COLORS (Softer & Cooler)
     bg_color = "#D1E0EC"      # Cooler, very light blue-gray background
