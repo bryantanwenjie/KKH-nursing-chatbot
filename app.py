@@ -775,25 +775,26 @@ st.markdown(f"""
         background-color: {card_hover} !important;
     }}
     
-    /* 👉 FIX 2: Clean up the Error and Success boxes 👈 */
+    /* 👉 FIX 2: High-Contrast Alert Boxes & Links 👈 */
     [data-testid="stAlert"] {{
-        background-color: {card_bg} !important;
-        color: {text_main} !important;
+        background-color: rgba(15, 23, 42, 0.6) !important; /* A deeper, cleaner dark background */
         border: 1px solid {divider_color} !important;
+        border-left: 4px solid #206BC4 !important; /* Adds a professional accent line on the left */
+        color: {text_main} !important;
     }}
     [data-testid="stAlert"] p {{
         color: {text_main} !important;
     }}
+    /* Fix the unreadable dark blue email links */
+    [data-testid="stAlert"] a {{
+        color: #38BDF8 !important; /* A bright, readable sky blue */
+        font-weight: 600;
+        text-decoration: none;
+    }}
+    [data-testid="stAlert"] a:hover {{
+        text-decoration: underline;
+    }}
     
-    [data-testid="stSidebar"] {{
-        background-color: {card_bg} !important; 
-    }}
-
-    hr {{
-        border-bottom-color: {divider_color} !important;
-        opacity: 1 !important;
-    }}
-
     /* REVISED BLUE BUTTON */
     div[data-testid="stButton"] button[kind="primary"] {{
         background-color: #206BC4 !important; 
