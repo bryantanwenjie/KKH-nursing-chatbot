@@ -748,7 +748,7 @@ if st.session_state.dark_mode:
     card_hover = "rgba(255,255,255,0.12)"
 else:
     # REVISED EXACT COLORS (Softer & Cooler)
-    bg_color = "#C8DAE8"      # Cooler, very light blue-gray background
+    bg_color = "#D1E0EC"      # Cooler, very light blue-gray background
     text_main = "#141D2B"     # Deep navy-slate for headers
     text_sub = "#5E6A78"      # Softer gray for subtext
     nav_color = "#5E6A78"
