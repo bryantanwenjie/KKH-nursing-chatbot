@@ -1121,7 +1121,7 @@ else:
                     chat_history_lc = get_langchain_history(current_messages[:-1])
                     agent_input = latest_user_input
                     
-                    if app_mode == "Vision (Image)" and uploaded_file is not None:
+                    if uploaded_file is not None:
                         img_bytes = uploaded_file.getvalue()
                         encoded_img = base64.b64encode(img_bytes).decode("utf-8")
                         image_data = f"data:image/jpeg;base64,{encoded_img}"
