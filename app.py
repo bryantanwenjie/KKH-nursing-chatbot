@@ -762,10 +762,33 @@ st.markdown(f"""
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
+
+    /* 👉 FIX 1: Tame the blinding white secondary buttons 👈 */
+    div[data-testid="stButton"] button[kind="secondary"] {{
+        background-color: transparent !important;
+        color: {text_main} !important;
+        border: 1px solid {divider_color} !important;
+    }}
+    div[data-testid="stButton"] button[kind="secondary"]:hover {{
+        border-color: #206BC4 !important;
+        color: #206BC4 !important;
+        background-color: {card_hover} !important;
+    }}
+    
+    /* 👉 FIX 2: Clean up the Error and Success boxes 👈 */
+    [data-testid="stAlert"] {{
+        background-color: {card_bg} !important;
+        color: {text_main} !important;
+        border: 1px solid {divider_color} !important;
+    }}
+    [data-testid="stAlert"] p {{
+        color: {text_main} !important;
+    }}
+    
     [data-testid="stSidebar"] {{
         background-color: {card_bg} !important; 
     }}
-    
+
     hr {{
         border-bottom-color: {divider_color} !important;
         opacity: 1 !important;
