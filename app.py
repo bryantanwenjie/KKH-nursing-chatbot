@@ -743,7 +743,7 @@ if st.session_state.dark_mode:
     text_main = "#F8FAFC"
     text_sub = "#CBD5E1"
     nav_color = "#E2E8F0"
-    divider_color = "#334155"
+    divider_color = "#F8FAFC"
     card_bg = "#334155"   
     card_hover = "rgba(255,255,255,0.12)"
 else:
