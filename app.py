@@ -784,20 +784,21 @@ st.markdown(f"""
         background-color: #2563EB !important; 
     }}
 
-    /* 4. 👉 SECONDARY BUTTONS & POPOVERS (Visible Outlines) 👈 */
+    /* 4. 👉 SECONDARY BUTTONS & POPOVERS (Matching the "Learn More" style) 👈 */
     div[data-testid="stButton"] button[kind="secondary"],
-    div[data-testid="stPopover"] button {{
-        background-color: transparent !important;
-        color: #F8FAFC !important;
-        border: 1px solid #64748B !important; 
+    div[data-testid="stPopover"] button {
+        background-color: #FFFFFF !important; /* Forces the button to be pure white */
+        color: {text_main} !important; 
+        border: 1px solid {divider_color} !important; 
         border-radius: 8px !important;
-    }}
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important; /* Adds a microscopic shadow for depth */
+    }
     div[data-testid="stButton"] button[kind="secondary"]:hover,
-    div[data-testid="stPopover"] button:hover {{
-        border-color: #3B82F6 !important;
-        color: #3B82F6 !important;
-        background-color: rgba(59, 130, 246, 0.1) !important;
-    }}
+    div[data-testid="stPopover"] button:hover {
+        border-color: #1D68BD !important;
+        color: #1D68BD !important;
+        background-color: #F8FAFC !important;
+    }
 
     /* 5. 👉 HIGH-CONTRAST ALERTS (Forcing Streamlit's colors out) 👈 */
     [data-testid="stAlert"] {{
