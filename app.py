@@ -747,15 +747,16 @@ if st.session_state.dark_mode:
     divider_color = "#1E293B" # Subtle dark borders
     card_bg = "#1E293B"       # Slightly lighter slate for the sidebar/alerts
     card_hover = "rgba(59, 130, 246, 0.1)" # A subtle blue hover effect
+    
 else:
-    # REVISED EXACT COLORS (Softer & Cooler)
-    bg_color = "#D1E0EC"      # Cooler, very light blue-gray background
-    text_main = "#141D2B"     # Deep navy-slate for headers
-    text_sub = "#5E6A78"      # Softer gray for subtext
-    nav_color = "#5E6A78"
-    divider_color = "#A3A9B0"
-    card_bg = "#FFFFFF"       
-    card_hover = "rgba(32, 107, 196, 0.05)"
+    # ☀️ EXACT LIGHT MODE MATCH (From your reference image)
+    bg_color = "#FFFFFF"      # Pure white background
+    text_main = "#111827"     # Very dark, crisp slate/black for headers
+    text_sub = "#6B7280"      # Medium gray for subtext and descriptions
+    nav_color = "#4B5563"
+    divider_color = "#E5E7EB" # Very faint, clean gray for the line divider
+    card_bg = "#F9FAFB"       # A microscopic off-white for the sidebar to separate it
+    card_hover = "rgba(37, 99, 235, 0.05)"
 
 # --- CUSTOM CSS ---
 st.markdown(f"""
