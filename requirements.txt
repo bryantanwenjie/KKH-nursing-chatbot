@@ -19,3 +19,5 @@ faiss-cpu                  # Required for Joeson's Vector Store
 
 # --- CHEE YOU'S REQUIREMENTS ---
 pyodbc
+torch
+torchvision
