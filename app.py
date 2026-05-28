@@ -774,7 +774,6 @@ else:
     sec_btn_border = "#E2E8F0"
 
 # --- CUSTOM CSS ---
-# --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
     /* 1. App & Background Layout */
