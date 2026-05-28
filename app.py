@@ -785,18 +785,18 @@ st.markdown(f"""
 
     /* 4. 👉 SECONDARY BUTTONS & POPOVERS (Visible Outlines) 👈 */
     div[data-testid="stButton"] button[kind="secondary"],
-    div[data-testid="stPopover"] button {
+    div[data-testid="stPopover"] button {{
         background-color: transparent !important;
         color: #F8FAFC !important;
         border: 1px solid #64748B !important; 
         border-radius: 8px !important;
-    }
+    }}
     div[data-testid="stButton"] button[kind="secondary"]:hover,
-    div[data-testid="stPopover"] button:hover {
+    div[data-testid="stPopover"] button:hover {{
         border-color: #3B82F6 !important;
         color: #3B82F6 !important;
         background-color: rgba(59, 130, 246, 0.1) !important;
-    }
+    }}
 
     /* 5. 👉 HIGH-CONTRAST ALERTS (Forcing Streamlit's colors out) 👈 */
     [data-testid="stAlert"] {{
