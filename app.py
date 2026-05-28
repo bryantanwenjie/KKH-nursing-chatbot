@@ -738,26 +738,42 @@ def register_popup():
         st.rerun()
 
 # --- DYNAMIC THEME COLORS ---
+# --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    # 🌙 MATCHING YOUR NEW SLEEK DARK REFERENCE
-    bg_color = "#0F172A"      # Very deep slate/navy for the main background
-    text_main = "#FFFFFF"     # Pure white for high contrast
-    text_sub = "#94A3B8"      # Soft silver/gray for subtext
+    # 🌙 PREMIUM DARK MODE (Base44 Style)
+    bg_color = "#0B1120"       # Ultra-deep navy background
+    text_main = "#FFFFFF"
+    text_sub = "#94A3B8"
     nav_color = "#E2E8F0"
-    divider_color = "#1E293B" # Subtle dark borders
-    card_bg = "#1E293B"       # Slightly lighter slate for the sidebar/alerts
-    card_hover = "rgba(59, 130, 246, 0.1)" # A subtle blue hover effect
-
+    divider_color = "#1E293B"
+    card_bg = "#0F172A"        # Slightly elevated dark card color
+    card_hover = "rgba(59, 130, 246, 0.1)"
+    
+    # New Dynamic Variables for Dark Mode
+    badge_bg = "rgba(59, 130, 246, 0.1)" # Faint blue glowing background
+    badge_text = "#3B82F6"               # Bright blue text
+    badge_border = "rgba(59, 130, 246, 0.2)"
+    primary_btn = "#3B82F6"              # Vibrant blue
+    primary_hover = "#2563EB"
+    sec_btn_border = "#334155"           # Visible dark-slate border for "Learn More"
 else:
-    # ☀️ EXACT LIGHT MODE MATCH (Premium Soft Blue-Gray)
-    bg_color = "#F4F7F9"      # The subtle, cool light-blue/gray background
-    text_main = "#0F172A"     # Deep slate for high-contrast headers
-    text_sub = "#475569"      # Rich gray for readable subtext
-    nav_color = "#475569"     # Navigation links
-    divider_color = "#E2E8F0" # Very faint, clean gray for dividers
-    card_bg = "#FFFFFF"       # Pure white so the sidebar and alerts pop off the background
+    # ☀️ PREMIUM LIGHT MODE (Base44 Style)
+    bg_color = "#F4F7F9"
+    text_main = "#0F172A"
+    text_sub = "#475569"
+    nav_color = "#475569"
+    divider_color = "#E2E8F0"
+    card_bg = "#FFFFFF"
     card_hover = "rgba(29, 104, 189, 0.05)"
-
+    
+    # New Dynamic Variables for Light Mode
+    badge_bg = "#EBF2FA"
+    badge_text = "#1D68BD"
+    badge_border = "#D6E4F4"
+    primary_btn = "#1D68BD"              # Deep professional blue
+    primary_hover = "#15529A"
+    sec_btn_border = "#E2E8F0"
+    
 # --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
