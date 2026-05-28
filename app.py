@@ -752,7 +752,7 @@ else:
     text_main = "#141D2B"     # Deep navy-slate for headers
     text_sub = "#5E6A78"      # Softer gray for subtext
     nav_color = "#5E6A78"
-    divider_color = "#E1E7EF"
+    divider_color = "#A3A9B0"
     card_bg = "#FFFFFF"       
     card_hover = "rgba(32, 107, 196, 0.05)"
 
