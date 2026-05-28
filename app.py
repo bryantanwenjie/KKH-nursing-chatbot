@@ -290,7 +290,7 @@ tools = [
 ]
 
 # Initialize Your Google Model
-llm_gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
+llm_gemini = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite", temperature=0)
 
 # JOESON'S CODE: Initialize his Azure Model
 try:
