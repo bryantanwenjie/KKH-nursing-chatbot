@@ -760,19 +760,18 @@ else:
 # --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
+    /* 1. App & Background Layout */
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
-    [data-testid="stSidebar"] {{
-        background-color: {card_bg} !important; 
-    }}
-    
+    /* 2. Sidebar & Dividers */
+    [data-testid="stSidebar"] {{ background-color: {card_bg} !important; }}
     hr {{
         border-bottom-color: {divider_color} !important;
         opacity: 1 !important;
     }}
 
-    /* 👉 MATCHING THE VIBRANT BLUE BUTTONS 👈 */
+    /* 3. 👉 PRIMARY BUTTONS (Vibrant Blue) 👈 */
     div[data-testid="stButton"] button[kind="primary"] {{
         background-color: #3B82F6 !important; 
         border-color: #3B82F6 !important; 
@@ -781,14 +780,40 @@ st.markdown(f"""
         font-weight: 600;
     }}
     div[data-testid="stButton"] button[kind="primary"]:hover {{ 
-        background-color: #2563EB !important; /* Slightly darker on hover */
+        background-color: #2563EB !important; 
     }}
-    
-    div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1A59A4 !important; }}
-    
+
+    /* 4. 👉 SECONDARY BUTTONS (Sleek Outlines) 👈 */
+    div[data-testid="stButton"] button[kind="secondary"] {{
+        background-color: transparent !important;
+        color: {text_main} !important;
+        border: 1px solid {divider_color} !important;
+    }}
+    div[data-testid="stButton"] button[kind="secondary"]:hover {{
+        border-color: #3B82F6 !important;
+        color: #3B82F6 !important;
+        background-color: rgba(59, 130, 246, 0.1) !important;
+    }}
+
+    /* 5. 👉 HIGH-CONTRAST ALERTS & SUCCESS BOXES 👈 */
+    [data-testid="stAlert"] {{
+        background-color: {card_bg} !important; 
+        border: 1px solid {divider_color} !important;
+        color: {text_main} !important;
+        border-radius: 8px !important;
+    }}
+    [data-testid="stAlert"] p {{
+        color: {text_main} !important;
+    }}
+    [data-testid="stAlert"] a {{
+        color: #38BDF8 !important; 
+        font-weight: 600 !important;
+        text-decoration: none !important;
+    }}
+
+    /* 6. Landing Page Elements */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
     
-    /* REVISED LIGHT BLUE BADGE */
     .badge {{ 
         background-color: #EBF2FA; 
         color: #206BC4; 
@@ -802,54 +827,40 @@ st.markdown(f"""
     }}
     
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
-    
-    /* REVISED TEAL 'AI' TEXT */
-    .hero-title span {{ color: #2CB09C; }}
-    
+    .hero-title span {{ color: #3B82F6; }} 
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
-    /* --- NEW: STATISTICS ROW STYLES --- */
+    /* 7. Stats Container */
     .stats-container {{
-        display: flex;
-        align-items: center;
-        gap: 30px;
-        margin-top: 40px;
-        padding-top: 30px;
-        border-top: 1px solid {divider_color};
+        display: flex; align-items: center; gap: 30px; margin-top: 40px; padding-top: 30px; border-top: 1px solid {divider_color};
     }}
-    .stat-item {{
-        display: flex;
-        flex-direction: column;
-    }}
-    .stat-value {{
-        font-size: 1.8rem;
-        font-weight: 800;
-        color: {text_main};
-        line-height: 1.1;
-    }}
-    .stat-label {{
-        font-size: 0.85rem;
-        color: {text_sub};
-        font-weight: 500;
-        margin-top: 4px;
-    }}
-    .stat-divider {{
-        height: 45px;
-        width: 2px;
-        background-color: {text_sub};
-        opacity: 0.25;
-    }}
-    /* --------------------------------- */
+    .stat-item {{ display: flex; flex-direction: column; }}
+    .stat-value {{ font-size: 1.8rem; font-weight: 800; color: {text_main}; line-height: 1.1; }}
+    .stat-label {{ font-size: 0.85rem; color: {text_sub}; font-weight: 500; margin-top: 4px; }}
+    .stat-divider {{ height: 45px; width: 2px; background-color: {text_sub}; opacity: 0.25; }}
     
+    /* 8. Chat UI Elements */
     .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
     
-    .disclaimer-box {{ font-size: 11px; color: {text_sub}; background: {card_bg}; padding: 10px; border-radius: 8px; margin-top: 30px; text-align: center; border: 1px solid {divider_color}; }}
+    /* 9. 👉 CUSTOM DISCLAIMER BOX 👈 */
+    .disclaimer-box {{ 
+        background-color: rgba(15, 23, 42, 0.6); 
+        border: 1px solid {divider_color};
+        border-left: 3px solid #F59E0B; 
+        padding: 15px; 
+        border-radius: 8px; 
+        margin-top: 30px; 
+        text-align: left; 
+        color: {text_sub};
+        font-size: 11px;
+        line-height: 1.5;
+    }}
     
     .studio-btn-wrapper div[data-testid="stButton"] button {{
         width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
     }}
     .studio-btn-wrapper div[data-testid="stButton"] button:hover {{
-        border-color: #206BC4; background: {card_hover}; transform: translateY(-2px);
+        border-color: #3B82F6; background: {card_hover}; transform: translateY(-2px);
     }}
 </style>
 """, unsafe_allow_html=True)
