@@ -1056,32 +1056,32 @@ else:
         # Tools Popover
         uploaded_file = None
         spoken_text = None
-        app_mode = "Clinical Text & Docs"
         
-        with st.popover("➕ Tools & Attachments", help="Upload images, video, or speech"):
-            app_mode = st.selectbox("Select AI Capability:", ["Clinical Text & Docs", "Vision (Image)", "Speech-to-Text", "Quiz Generator"])
+        with st.popover("➕ Tools & Attachments", help="Quick Actions"):
+            # 1. Image Uploader
+            st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 0px;'>📷 Vision Analysis</p>", unsafe_allow_html=True)
+            uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
             
-            # ---> DELETED THE "Select AI Brain" DROPDOWN <---
+            st.divider()
             
-            if app_mode == "Vision (Image)":
-                uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
-                
-            elif app_mode == "Speech-to-Text":
-                st.markdown("<p style='font-size: 14px; font-weight: 600;'>🎤 Click to Speak:</p>", unsafe_allow_html=True)
-                spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
+            # 2. Voice Input
+            st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 0px;'>🎤 Voice to Text</p>", unsafe_allow_html=True)
+            spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
 
-            elif app_mode == "Quiz Generator":
-                st.info("Open the full quiz page to generate and answer MCQ questions.")
-                if st.button("Open Quiz Generator", type="primary", use_container_width=True):
-                    st.session_state.current_page = "quiz"
-                    st.rerun()
+            st.divider()
+            
+            # 3. Quiz Mode
+            st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px;'>📝 Education Mode</p>", unsafe_allow_html=True)
+            if st.button("Open Quiz Generator", use_container_width=True):
+                st.session_state.current_page = "quiz"
+                st.rerun()
 
         # --- State to remember the model choice across reruns ---
         if "model_choice" not in st.session_state:
             st.session_state.model_choice = "Gemini"
 
-        # Input Handling
-        user_input = st.chat_input(f"Message NursBot ({app_mode})...")
+        # Input Handling (Always defaults to standard text!)
+        user_input = st.chat_input("Message NursBot...")
         
         # 1. Did the user use a Studio button?
         if st.session_state.studio_prompt_trigger:
