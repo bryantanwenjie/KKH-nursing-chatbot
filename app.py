@@ -773,7 +773,7 @@ else:
     primary_btn = "#1D68BD"              # Deep professional blue
     primary_hover = "#15529A"
     sec_btn_border = "#E2E8F0"
-    
+
 # --- CUSTOM CSS ---
 st.markdown(f"""
 <style>
@@ -788,38 +788,39 @@ st.markdown(f"""
         opacity: 1 !important;
     }}
 
-    /* 3. 👉 PRIMARY BUTTONS (Base44 Solid Blue) 👈 */
+    /* 3. 👉 PRIMARY BUTTONS (Dynamic Base44 Blue) 👈 */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #1D68BD !important; 
-        border-color: #1D68BD !important; 
+        background-color: {primary_btn} !important; 
+        border-color: {primary_btn} !important; 
         color: white !important; 
         border-radius: 8px !important; 
         font-weight: 600;
     }}
     div[data-testid="stButton"] button[kind="primary"]:hover {{ 
-        background-color: #15529A !important; 
+        background-color: {primary_hover} !important; 
+        border-color: {primary_hover} !important;
     }}
 
-    /* 4. 👉 SECONDARY BUTTONS & POPOVERS (White Cards for Base44 Depth) 👈 */
+    /* 4. 👉 SECONDARY BUTTONS & POPOVERS (Learn More / Tools) 👈 */
     div[data-testid="stButton"] button[kind="secondary"],
     div[data-testid="stPopover"] button {{
         background-color: {card_bg} !important;
         color: {text_main} !important; 
-        border: 1px solid {divider_color} !important; 
+        border: 1px solid {sec_btn_border} !important; 
         border-radius: 8px !important;
         box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     }}
     div[data-testid="stButton"] button[kind="secondary"]:hover,
     div[data-testid="stPopover"] button:hover {{
-        border-color: #1D68BD !important;
-        color: #1D68BD !important;
-        background-color: rgba(29, 104, 189, 0.05) !important;
+        border-color: {primary_btn} !important;
+        color: {primary_btn} !important;
+        background-color: {badge_bg} !important;
     }}
 
     /* 5. 👉 HIGH-CONTRAST ALERTS 👈 */
     [data-testid="stAlert"] {{
         background-color: {card_bg} !important; 
-        border: 1px solid {divider_color} !important;
+        border: 1px solid {sec_btn_border} !important;
         border-radius: 8px !important;
     }}
     [data-testid="stAlert"] > div {{
@@ -830,7 +831,7 @@ st.markdown(f"""
         color: {text_main} !important;
     }}
     [data-testid="stAlert"] a {{
-        color: #1D68BD !important; 
+        color: {primary_btn} !important; 
         font-weight: 600 !important;
         text-decoration: none !important;
     }}
@@ -838,23 +839,23 @@ st.markdown(f"""
         text-decoration: underline !important;
     }}
 
-    /* 6. Landing Page Elements */
+    /* 6. 👉 LANDING PAGE & DYNAMIC BADGE 👈 */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
     
     .badge {{ 
-        background-color: #EBF2FA; 
-        color: #1D68BD; 
+        background-color: {badge_bg}; 
+        color: {badge_text}; 
         padding: 6px 16px; 
         border-radius: 20px; 
         font-size: 13px; 
         font-weight: 700; 
         display: inline-block; 
         margin-bottom: 1rem; 
-        border: 1px solid #D6E4F4; 
+        border: 1px solid {badge_border}; 
     }}
     
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
-    .hero-title span {{ color: #2CB09C; }} 
+    .hero-title span {{ color: {primary_btn}; }} 
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
     /* 7. Stats Container */
@@ -869,10 +870,10 @@ st.markdown(f"""
     /* 8. Chat UI Elements */
     .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
     
-    /* 9. 👉 CUSTOM DISCLAIMER BOX 👈 */
+    /* 9. Custom Disclaimer Box */
     .disclaimer-box {{ 
         background-color: {card_bg}; 
-        border: 1px solid {divider_color};
+        border: 1px solid {sec_btn_border};
         border-left: 3px solid #F59E0B; 
         padding: 15px; 
         border-radius: 8px; 
@@ -884,17 +885,17 @@ st.markdown(f"""
     }}
     
     .studio-btn-wrapper div[data-testid="stButton"] button {{
-        width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
+        width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {sec_btn_border}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
     }}
     .studio-btn-wrapper div[data-testid="stButton"] button:hover {{
-        border-color: #1D68BD; background: {card_hover}; transform: translateY(-2px);
+        border-color: {primary_btn}; background: {card_hover}; transform: translateY(-2px);
     }}
 
-    /* 10. 👉 PREMIUM IMAGE STYLING (Rounded Corners & Soft Shadow) 👈 */
+    /* 10. Premium Image Styling */
     [data-testid="stImage"] img {{
         border-radius: 24px !important; 
         box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02) !important; 
-        border: 1px solid #F3F4F6 !important; 
+        border: 1px solid {divider_color} !important; 
     }}
 </style>
 """, unsafe_allow_html=True)
