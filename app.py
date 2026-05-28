@@ -740,7 +740,7 @@ def register_popup():
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
     # 🌙 MATCHING YOUR NEW SLEEK DARK REFERENCE
-    bg_color = "#1D2633"      # Very deep slate/navy for the main background
+    bg_color = "#233043"      # Very deep slate/navy for the main background
     text_main = "#FFFFFF"     # Pure white for high contrast
     text_sub = "#94A3B8"      # Soft silver/gray for subtext
     nav_color = "#E2E8F0"
