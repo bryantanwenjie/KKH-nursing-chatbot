@@ -292,13 +292,13 @@ tools = [
 # Initialize Your Google Model
 llm_gemini = ChatGoogleGenerativeAI(model="gemini-3-flash-preview", temperature=0)
 
-# 👉 JOESON'S CODE: Initialize his Azure Model
+# JOESON'S CODE: Initialize his Azure Model
 try:
     llm_azure = AzureChatOpenAI(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION", ""),
-        azure_deployment=os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", ""),
+        azure_endpoint=st.secrets["JOESON_AZURE_OPENAI_ENDPOINT"],
+        api_key=st.secrets["JOESON_AZURE_OPENAI_API_KEY"],
+        api_version=st.secrets["JOESON_AZURE_OPENAI_API_VERSION"],
+        azure_deployment=st.secrets["JOESON_AZURE_OPENAI_CHAT_DEPLOYMENT"],
         temperature=0
     )
 except:
@@ -345,18 +345,15 @@ def get_quiz_pdf_path():
             return path
     return QUIZ_PDF_PATHS[0]
 
-
 def check_quiz_env():
     required_keys = [
-        "AZURE_OPENAI_ENDPOINT",
-        "AZURE_OPENAI_API_KEY",
-        "AZURE_OPENAI_API_VERSION",
-        "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
-        "AZURE_OPENAI_CHAT_DEPLOYMENT",
+        "CHEEYOU_AZURE_OPENAI_ENDPOINT",
+        "CHEEYOU_AZURE_OPENAI_API_KEY",
+        "CHEEYOU_AZURE_OPENAI_API_VERSION",
+        "CHEEYOU_AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
+        "CHEEYOU_AZURE_OPENAI_CHAT_DEPLOYMENT",
     ]
-    # UPDATED: Checks st.secrets directly instead of os.getenv
     return [key for key in required_keys if key not in st.secrets]
-
 
 def clean_json_response(text):
     text = text.strip()
@@ -364,7 +361,6 @@ def clean_json_response(text):
     text = re.sub(r"^```", "", text)
     text = re.sub(r"```$", "", text)
     return text.strip()
-
 
 @st.cache_resource(show_spinner=False)
 def create_quiz_vectorstore():
@@ -375,24 +371,21 @@ def create_quiz_vectorstore():
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = splitter.split_documents(documents)
 
-    # UPDATED: Pulls directly from st.secrets
     embeddings = AzureOpenAIEmbeddings(
-        azure_endpoint=st.secrets["AZURE_OPENAI_ENDPOINT"],
-        api_key=st.secrets["AZURE_OPENAI_API_KEY"],
-        api_version=st.secrets["AZURE_OPENAI_API_VERSION"],
-        azure_deployment=st.secrets["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
+        azure_endpoint=st.secrets["CHEEYOU_AZURE_OPENAI_ENDPOINT"],
+        api_key=st.secrets["CHEEYOU_AZURE_OPENAI_API_KEY"],
+        api_version=st.secrets["CHEEYOU_AZURE_OPENAI_API_VERSION"],
+        azure_deployment=st.secrets["CHEEYOU_AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
     )
     return FAISS.from_documents(chunks, embeddings)
 
-
 @st.cache_resource(show_spinner=False)
 def create_quiz_llm():
-    # UPDATED: Pulls directly from st.secrets
     return AzureChatOpenAI(
-        azure_endpoint=st.secrets["AZURE_OPENAI_ENDPOINT"],
-        api_key=st.secrets["AZURE_OPENAI_API_KEY"],
-        api_version=st.secrets["AZURE_OPENAI_API_VERSION"],
-        azure_deployment=st.secrets["AZURE_OPENAI_CHAT_DEPLOYMENT"],
+        azure_endpoint=st.secrets["CHEEYOU_AZURE_OPENAI_ENDPOINT"],
+        api_key=st.secrets["CHEEYOU_AZURE_OPENAI_API_KEY"],
+        api_version=st.secrets["CHEEYOU_AZURE_OPENAI_API_VERSION"],
+        azure_deployment=st.secrets["CHEEYOU_AZURE_OPENAI_CHAT_DEPLOYMENT"],
         temperature=0,
     )
 
