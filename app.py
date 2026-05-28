@@ -41,22 +41,43 @@ if "AZURE_OPENAI_API_KEY" in st.secrets:
 
 # --- AZURE SQL DATABASE CONNECTION + LOGIN SYSTEM ---
 def get_db_connection():
-    server = st.secrets["AZURE_SQL_SERVER"]
-    database = st.secrets["AZURE_SQL_DATABASE"]
-    username = st.secrets["AZURE_SQL_USERNAME"]
+    server = st.secrets["AZURE_SQL_SERVER"].strip()
+    database = st.secrets["AZURE_SQL_DATABASE"].strip()
+    username = st.secrets["AZURE_SQL_USERNAME"].strip()
     password = st.secrets["AZURE_SQL_PASSWORD"]
 
-    conn = pyodbc.connect(
-        "DRIVER={ODBC Driver 17 for SQL Server};"  # <-- CHANGED THIS FROM 18 TO 17
+    # Cheeyou's Fix: Make sure server format is correct
+    if server.startswith("tcp:"):
+        server = server.replace("tcp:", "")
+    if ",1433" in server:
+        server = server.replace(",1433", "")
+
+    conn_str = (
+        "DRIVER={ODBC Driver 17 for SQL Server};"  # <-- KEPT YOUR FIX (Driver 17 for Streamlit Cloud)
         f"SERVER=tcp:{server},1433;"
         f"DATABASE={database};"
         f"UID={username};"
         f"PWD={password};"
         "Encrypt=yes;"
         "TrustServerCertificate=no;"
-        "Connection Timeout=60;"
+        "Connection Timeout=30;"
     )
-    return conn
+
+    try:
+        conn = pyodbc.connect(conn_str)
+        return conn
+    except pyodbc.Error as e:
+        st.error("Azure SQL connection failed.")
+        st.code(str(e))
+        st.info("""
+Please check:
+1. Azure SQL firewall has your current IP address added.
+2. Server name is like: yourserver.database.windows.net
+3. Port 1433 is not blocked by school/WiFi/firewall.
+4. Username and password are correct.
+5. Database name is correct.
+""")
+        return None
 
 
 def hash_password(password):
@@ -66,6 +87,8 @@ def hash_password(password):
 def register_user(full_name, email, password):
     try:
         conn = get_db_connection()
+        if conn is None:  # Cheeyou's Fix: Prevent crash if DB is down
+            return False, "Cannot connect to Azure SQL Database."
         cursor = conn.cursor()
         password_hash = hash_password(password)
 
@@ -91,6 +114,9 @@ def register_user(full_name, email, password):
 def login_user(email, password):
     try:
         conn = get_db_connection()
+        if conn is None:  # Cheeyou's Fix: Prevent crash if DB is down
+            return False, None
+
         cursor = conn.cursor()
         password_hash = hash_password(password)
 
@@ -106,7 +132,7 @@ def login_user(email, password):
 
         if row:
             return True, {
-                "user_id": row[0],
+                "user_id": row,
                 "full_name": row[1],
                 "email": row[2]
             }
