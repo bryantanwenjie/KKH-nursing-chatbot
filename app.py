@@ -783,33 +783,41 @@ st.markdown(f"""
         background-color: #2563EB !important; 
     }}
 
-    /* 4. 👉 SECONDARY BUTTONS (Sleek Outlines) 👈 */
-    div[data-testid="stButton"] button[kind="secondary"] {{
+    /* 4. 👉 SECONDARY BUTTONS (Visible Outlines) 👈 */
+    div[data-testid="stButton"] button[kind="secondary"] {
         background-color: transparent !important;
-        color: {text_main} !important;
-        border: 1px solid {divider_color} !important;
-    }}
-    div[data-testid="stButton"] button[kind="secondary"]:hover {{
+        color: #F8FAFC !important;
+        border: 1px solid #64748B !important; /* Made the border lighter so the button is visible! */
+        border-radius: 8px !important;
+    }
+    div[data-testid="stButton"] button[kind="secondary"]:hover {
         border-color: #3B82F6 !important;
         color: #3B82F6 !important;
         background-color: rgba(59, 130, 246, 0.1) !important;
-    }}
+    }
 
-    /* 5. 👉 HIGH-CONTRAST ALERTS & SUCCESS BOXES 👈 */
-    [data-testid="stAlert"] {{
-        background-color: {card_bg} !important; 
-        border: 1px solid {divider_color} !important;
-        color: {text_main} !important;
+    /* 5. 👉 HIGH-CONTRAST ALERTS (Forcing Streamlit's colors out) 👈 */
+    [data-testid="stAlert"] {
+        background-color: #1E293B !important; 
+        border: 1px solid #475569 !important;
         border-radius: 8px !important;
-    }}
-    [data-testid="stAlert"] p {{
-        color: {text_main} !important;
-    }}
-    [data-testid="stAlert"] a {{
+    }
+    /* This specific line strips out Streamlit's default red/green colors */
+    [data-testid="stAlert"] > div {
+        background-color: transparent !important; 
+    }
+    [data-testid="stAlert"] p, 
+    [data-testid="stAlert"] span {
+        color: #F8FAFC !important;
+    }
+    [data-testid="stAlert"] a {
         color: #38BDF8 !important; 
         font-weight: 600 !important;
         text-decoration: none !important;
-    }}
+    }
+    [data-testid="stAlert"] a:hover {
+        text-decoration: underline !important;
+    }
 
     /* 6. Landing Page Elements */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
