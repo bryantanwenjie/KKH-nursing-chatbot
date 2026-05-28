@@ -762,6 +762,11 @@ st.markdown(f"""
     [data-testid="stAppViewContainer"] {{ background: {bg_color}; }}
     [data-testid="stHeader"] {{ background: transparent; }}
     
+    hr {{
+        border-bottom-color: {divider_color} !important;
+        opacity: 1 !important;
+    }}
+    
     /* REVISED BLUE BUTTON */
     div[data-testid="stButton"] button[kind="primary"] {{
         background-color: #206BC4 !important; 
