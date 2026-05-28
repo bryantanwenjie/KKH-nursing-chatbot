@@ -866,6 +866,13 @@ st.markdown(f"""
         font-size: 11px;
         line-height: 1.5;
     }}
+
+    /* 10. 👉 PREMIUM IMAGE STYLING (Rounded Corners & Soft Shadow) 👈 */
+    [data-testid="stImage"] img {
+        border-radius: 24px !important; /* Large, smooth rounded corners */
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02) !important; /* Layered, soft drop shadow */
+        border: 1px solid #F3F4F6 !important; /* Microscopic border to define the edge */
+    }
     
     .studio-btn-wrapper div[data-testid="stButton"] button {{
         width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {divider_color}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
