@@ -772,14 +772,18 @@ st.markdown(f"""
         opacity: 1 !important;
     }}
 
-    /* REVISED BLUE BUTTON */
+    /* 👉 MATCHING THE VIBRANT BLUE BUTTONS 👈 */
     div[data-testid="stButton"] button[kind="primary"] {{
-        background-color: #206BC4 !important; 
-        border-color: #206BC4 !important; 
+        background-color: #3B82F6 !important; 
+        border-color: #3B82F6 !important; 
         color: white !important; 
         border-radius: 8px !important; 
         font-weight: 600;
     }}
+    div[data-testid="stButton"] button[kind="primary"]:hover {{ 
+        background-color: #2563EB !important; /* Slightly darker on hover */
+    }}
+    
     div[data-testid="stButton"] button[kind="primary"]:hover {{ background-color: #1A59A4 !important; }}
     
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
