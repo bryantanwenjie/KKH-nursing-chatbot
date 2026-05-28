@@ -354,7 +354,8 @@ def check_quiz_env():
         "AZURE_OPENAI_EMBEDDING_DEPLOYMENT",
         "AZURE_OPENAI_CHAT_DEPLOYMENT",
     ]
-    return [key for key in required_keys if not os.getenv(key)]
+    # UPDATED: Checks st.secrets directly instead of os.getenv
+    return [key for key in required_keys if key not in st.secrets]
 
 
 def clean_json_response(text):
@@ -371,32 +372,29 @@ def create_quiz_vectorstore():
     loader = PyPDFLoader(pdf_path)
     documents = loader.load()
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
-    )
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = splitter.split_documents(documents)
 
+    # UPDATED: Pulls directly from st.secrets
     embeddings = AzureOpenAIEmbeddings(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-        azure_deployment=os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT"),
+        azure_endpoint=st.secrets["AZURE_OPENAI_ENDPOINT"],
+        api_key=st.secrets["AZURE_OPENAI_API_KEY"],
+        api_version=st.secrets["AZURE_OPENAI_API_VERSION"],
+        azure_deployment=st.secrets["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
     )
-
     return FAISS.from_documents(chunks, embeddings)
 
 
 @st.cache_resource(show_spinner=False)
 def create_quiz_llm():
+    # UPDATED: Pulls directly from st.secrets
     return AzureChatOpenAI(
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
-        azure_deployment=os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT"),
+        azure_endpoint=st.secrets["AZURE_OPENAI_ENDPOINT"],
+        api_key=st.secrets["AZURE_OPENAI_API_KEY"],
+        api_version=st.secrets["AZURE_OPENAI_API_VERSION"],
+        azure_deployment=st.secrets["AZURE_OPENAI_CHAT_DEPLOYMENT"],
         temperature=0,
     )
-
 
 def generate_quiz(vectorstore, llm, topic, number_of_questions):
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
