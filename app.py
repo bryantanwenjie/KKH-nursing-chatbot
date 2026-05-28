@@ -386,7 +386,6 @@ def create_quiz_llm():
         api_key=st.secrets["CHEEYOU_AZURE_OPENAI_API_KEY"],
         api_version=st.secrets["CHEEYOU_AZURE_OPENAI_API_VERSION"],
         azure_deployment=st.secrets["CHEEYOU_AZURE_OPENAI_CHAT_DEPLOYMENT"],
-        temperature=0,
     )
 
 def generate_quiz(vectorstore, llm, topic, number_of_questions):
