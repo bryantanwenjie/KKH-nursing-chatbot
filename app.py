@@ -376,7 +376,7 @@ llm_gemini_bryan = ChatGoogleGenerativeAI(
 # Uses the custom ZHEN_RONG_GOOGLE_API_KEY from secrets
 zhen_rong_gemini_key = st.secrets.get("ZHEN_RONG_GOOGLE_API_KEY", "")
 llm_gemini_zhenrong = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",  # Put Zhen Rong's specific model name here
+    model="gemini-2.5-flash",  # Put Zhen Rong's specific model name here
     api_key=zhen_rong_gemini_key,
     temperature=0
 )
