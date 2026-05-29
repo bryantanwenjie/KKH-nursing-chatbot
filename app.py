@@ -215,12 +215,17 @@ def search_video_tutorial(user_question):
 
     videos = []
     for row in rows:
-        # Force the pyodbc.Row object to break apart into normal text strings!
+        # ABSOLUTELY FOOLPROOF: Extract each column by its exact index and force it to be a string
+        title_str = str(row) if row else "No Title"
+        topic_str = str(row) if row else "No Topic"
+        desc_str = str(row) if row else "No Description"
+        url_str = str(row) if row else ""
+
         videos.append({
-            "title": str(row),
-            "topic": str(row),
-            "description": str(row),
-            "youtube_url": str(row)
+            "title": title_str,
+            "topic": topic_str,
+            "description": desc_str,
+            "youtube_url": url_str
         })
     return videos
 
@@ -403,6 +408,7 @@ prompt = ChatPromptTemplate.from_messages([
     3. When quoting protocols, mention the Source Page Number provided by the tool.
     4. If calculating fluids or BP, clearly display the math and any clinical warnings.
     5. Be concise, structured, and use bullet points for readability.
+    6. IF the user asks for a video or tutorial, positively acknowledge their request, provide a brief clinical introduction, and state that you have retrieved the video from the database below. DO NOT say you cannot provide videos.
     """),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
@@ -1211,9 +1217,12 @@ else:
                         if videos:
                             full_response += "\n\n---\n\n📹 **Related Video Tutorials:**\n\n"
                             for video in videos:
-                                # Safe extraction since we fixed the database source
+                                # Safe extraction: it is now guaranteed to be a clean string
                                 embed_url = video['youtube_url'].replace("watch?v=", "embed/")
-                                full_response += f"**Title:** {video['title']}  \n**Topic:** {video['topic']}  \n**Description:** {video['description']}  \n\n"
+                                
+                                full_response += f"**Title:** {video['title']}  \n"
+                                full_response += f"**Topic:** {video['topic']}  \n"
+                                full_response += f"**Description:** {video['description']}  \n\n"
                                 full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
                         else:
                             full_response += "\n\n---\n\n*Note: I searched the SQL database, but no related video tutorials were found for this topic.*"
