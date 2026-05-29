@@ -939,6 +939,17 @@ st.markdown(f"""
     [data-testid="stChatInput"] > div:focus-within {{
         border-color: {primary_btn} !important;
     }}
+    
+    /* 👇 NEW: Make the inner typing area transparent so no nested box appears */
+    [data-testid="stChatInput"] textarea {{
+        background-color: transparent !important;
+        color: {text_main} !important;
+    }}
+    
+    /* 👇 NEW: Ensure the send button area also blends seamlessly */
+    [data-testid="stChatInput"] button {{
+        background-color: transparent !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
