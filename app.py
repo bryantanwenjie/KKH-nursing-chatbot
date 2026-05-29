@@ -1207,16 +1207,23 @@ else:
                                 {"type": "image_url", "image_url": {"url": image_data}}
                             ]
 
-                        # 2. Model Selection
+                        # 2. Model Selection based on UI Mode
                         if "Azure" in selected_mode:
                             if llm_azure is None:
                                 st.error("Azure OpenAI is not configured properly in secrets. Please check API keys.")
                                 st.stop()
                             active_llm = llm_azure
                             loading_text = "Azure OpenAI (Joeson's Model)"
-                        else:
-                            active_llm = llm_gemini
+                            
+                        elif "Gemini" in selected_mode:
+                            active_llm = llm_gemini_bryan
                             loading_text = "Gemini 3.1 Flash Lite (Bryan's Model)"
+                            
+                        elif "Database" in selected_mode:
+                            # If you ever want Zhen Rong's Gemini model to power video generation or analysis 
+                            # alongside the database search, route it here:
+                            active_llm = llm_gemini_zhenrong
+                            loading_text = "Gemini (Zhen Rong's Model)"
 
                         # 3. Execute Selected Agent
                         with st.spinner(f"Analyzing using {loading_text}..."):
