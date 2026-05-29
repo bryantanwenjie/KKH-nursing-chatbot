@@ -836,7 +836,7 @@ if st.session_state.dark_mode:
     primary_hover = "#2563EB"
     sec_btn_border = "#334155"
 else:
-    bg_color = "#F4F7F9"
+    bg_color = "#E4EEF5"
     text_main = "#0F172A"
     text_sub = "#475569"
     nav_color = "#475569"
