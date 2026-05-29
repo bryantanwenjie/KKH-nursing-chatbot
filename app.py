@@ -209,17 +209,14 @@ def search_video_tutorial(user_question):
         search_text
     )
 
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-
     videos = []
     for row in rows:
-        # ABSOLUTELY FOOLPROOF: Extract each column by its exact index and force it to be a string
-        title_str = str(row) if row else "No Title"
-        topic_str = str(row) if row else "No Topic"
-        desc_str = str(row) if row else "No Description"
-        url_str = str(row) if row else ""
+        # Extract each column by its exact index instead of turning the whole row into a string
+        # row = title, row = topic, row = description, row = youtube_url
+        title_str = str(row) if row and row else "No Title"
+        topic_str = str(row) if row and row else "No Topic"
+        desc_str = str(row) if row and row else "No Description"
+        url_str = str(row) if row and row else ""
 
         videos.append({
             "title": title_str,
