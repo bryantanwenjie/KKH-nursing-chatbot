@@ -127,15 +127,10 @@ def login_user(email, password):
         conn.close()
 
         if row:
-            # Force clean string extraction from the SQL tuple
-            extracted_id = row if not isinstance(row, tuple) else row
-            extracted_name = row if not isinstance(row, tuple) else row
-            extracted_email = row if not isinstance(row, tuple) else row
-
             return True, {
-                "user_id": extracted_id,
-                "full_name": extracted_name,
-                "email": extracted_email
+                "user_id": row[0],
+                "full_name": row[1],
+                "email": row[2]
             }
         return False, None
 
@@ -769,11 +764,8 @@ def login_popup():
 
                 if success:
                     st.session_state.logged_in = True
-                    
-                    # Strictly grab the text strings from the user dictionary
-                    st.session_state.user_email = user.get("email", email)
-                    st.session_state.user_full_name = user.get("full_name", "User")
-                    
+                    st.session_state.user_email = user["email"]
+                    st.session_state.user_full_name = user["full_name"]
                     st.session_state.app_started = True
                     st.session_state.current_page = "chat"
                     st.session_state.show_login_popup = False
