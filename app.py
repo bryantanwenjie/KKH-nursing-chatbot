@@ -133,8 +133,8 @@ def login_user(email, password):
         if row:
             return True, {
                 "user_id": row,
-                "full_name": row[1],
-                "email": row[2]
+                "full_name": row,
+                "email": row
             }
         return False, None
 
@@ -144,6 +144,89 @@ def login_user(email, password):
     except Exception as e:
         st.error(f"Unexpected error: {str(e)}")
         return False, None
+
+# 👉 ZHEN RONG'S CODE: Video Request & SQL Query Processing Functions
+def is_video_request(question):
+    question = question.lower()
+    video_keywords = [
+        "video",
+        "youtube",
+        "tutorial",
+        "watch",
+        "show me",
+        "demonstration",
+        "demo",
+        "link"
+    ]
+    return any(word in question for word in video_keywords)
+
+
+def search_video_tutorial(user_question):
+    conn = get_db_connection()
+    if conn is None:
+        return []
+    cursor = conn.cursor()
+    q = user_question.lower()
+
+    if (
+        "infant cpr" in q
+        or "baby cpr" in q
+        or "cpr" in q
+        or "cardiopulmonary resuscitation" in q
+        or "resuscitation" in q
+    ):
+        search_text = "%cpr%"
+    elif (
+        "blood pressure" in q
+        or "bp" in q
+        or "systolic" in q
+        or "diastolic" in q
+        or "measure blood pressure" in q
+        or "check blood pressure" in q
+    ):
+        search_text = "%blood_pressure%"
+    elif (
+        "heart rate" in q
+        or "pulse" in q
+        or "check pulse" in q
+        or "check heart rate" in q
+    ):
+        search_text = "%heart_rate%"
+    else:
+        search_text = "%" + q + "%"
+
+    query = """
+    SELECT TOP 3 title, topic, description, youtube_url
+    FROM video_tutorials
+    WHERE category LIKE ?
+       OR title LIKE ?
+       OR topic LIKE ?
+       OR description LIKE ?
+       OR keywords LIKE ?
+    """
+
+    cursor.execute(
+        query,
+        search_text,
+        search_text,
+        search_text,
+        search_text,
+        search_text
+    )
+
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    videos = []
+    for row in rows:
+        videos.append({
+            "title": row,
+            "topic": row,
+            "description": row,
+            "youtube_url": row
+        })
+    return videos
 
 # ==========================================
 # ======= BACKEND & CLINICAL LOGIC =========
@@ -343,7 +426,7 @@ def get_quiz_pdf_path():
     for path in QUIZ_PDF_PATHS:
         if os.path.exists(path):
             return path
-    return QUIZ_PDF_PATHS[0]
+    return QUIZ_PDF_PATHS
 
 def check_quiz_env():
     required_keys = [
@@ -1017,6 +1100,16 @@ else:
                 st.rerun()
         
         st.divider()
+
+        # 👉 ZHEN RONG'S CODE: Sidebar Suggestions & Examples Integration
+        st.markdown(f"<p style='color:{text_sub}; font-size:12px; font-weight:700; letter-spacing: 1px;'>💡 EXAMPLE QUESTIONS</p>", unsafe_allow_html=True)
+        st.caption("• What is the heart rate of an infant?")
+        st.caption("• Show me an infant CPR video")
+        st.caption("• Can I watch a blood pressure tutorial?")
+        st.caption("• How to check heart rate video?")
+        
+        st.divider()
+
         if st.button("⬅ Back to Home", use_container_width=True):
             st.session_state.app_started = False
             st.rerun()
@@ -1028,13 +1121,13 @@ else:
 
     # 2. MAIN LAYOUT
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns([3, 1], gap="large")
+        chat_col, studio_col = st.columns(, gap="large")
     else:
         chat_col = st.container()
 
     # 3. CENTER PANE: Chat
     with chat_col:
-        c1, c2 = st.columns([4, 1])
+        c1, c2 = st.columns()
         with c1:
             st.markdown(f"<div class='breadcrumb'>📁 KKH Workspace / Section 01 - Medical Emergencies</div>", unsafe_allow_html=True)
         with c2:
@@ -1108,6 +1201,40 @@ else:
         with chat_container:
             with st.chat_message("assistant"):
                 try:
+                    def stream_text(text):
+                        for word in text.split(" "):
+                            yield word + " "
+                            time.sleep(0.02)
+
+                    # 👉 ZHEN RONG'S CODE: Direct Video Request Handler Intercept
+                    if is_video_request(latest_user_input):
+                        with st.spinner("Searching video tutorials database..."):
+                            videos = search_video_tutorial(latest_user_input)
+                            if videos:
+                                full_response = "📹 **Video Tutorial Found:**\n\n"
+                                for video in videos:
+                                    full_response += (
+                                        f"**Title:** {video['title']}  \n"
+                                        f"**Topic:** {video['topic']}  \n"
+                                        f"**Description:** {video['description']}  \n"
+                                        f"**YouTube Link:** [Watch Video]({video['youtube_url']})  \n\n"
+                                        f"---\n\n"
+                                    )
+                            else:
+                                full_response = (
+                                    "I cannot find a related video tutorial link in the database.\n\n"
+                                    "**Available video topics:**\n"
+                                    "- CPR\n"
+                                    "- Blood Pressure\n"
+                                    "- Heart Rate"
+                                )
+                        
+                        st.write_stream(stream_text(full_response))
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
+                        time.sleep(0.1)
+                        st.rerun()
+
+                    # ---> EXISTING AGENT EXECUTION LOGIC <---
                     chat_history_lc = get_langchain_history(current_messages[:-1])
                     agent_input = latest_user_input
                     
@@ -1116,13 +1243,11 @@ else:
                         encoded_img = base64.b64encode(img_bytes).decode("utf-8")
                         image_data = f"data:image/jpeg;base64,{encoded_img}"
                         
-                        # CORRECTED: Just pass the list of content blocks, do NOT wrap it in HumanMessage()
                         agent_input = [
                             {"type": "text", "text": latest_user_input}, 
                             {"type": "image_url", "image_url": {"url": image_data}}
                         ]
 
-                    # ---> UPDATED: Check the memory state instead of app_mode <---
                     if st.session_state.model_choice == "Azure" and llm_azure is not None:
                         active_llm = llm_azure
                         loading_text = "Azure OpenAI (Joeson's Model)"
@@ -1130,9 +1255,7 @@ else:
                         active_llm = llm_gemini
                         loading_text = "Gemini (NursBot Default)"
 
-                    # The spinner will now accurately show Joeson's model
                     with st.spinner(f"Analyzing using {loading_text}..."):
-                        
                         agent = create_tool_calling_agent(active_llm, tools, prompt)
                         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
 
@@ -1145,13 +1268,7 @@ else:
                     match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
                     full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
                     
-                    def stream_text(text):
-                        for word in text.split(" "):
-                            yield word + " "
-                            time.sleep(0.02)
-                    
                     st.write_stream(stream_text(full_response))
-                    
                     st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
                     time.sleep(0.1)
                     st.rerun()
