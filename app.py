@@ -216,10 +216,10 @@ def search_video_tutorial(user_question):
     videos = []
     for row in rows:
         videos.append({
-            "title": row,
-            "topic": row,
-            "description": row,
-            "youtube_url": row
+            "title": str(row),
+            "topic": str(row),
+            "description": str(row),
+            "youtube_url": str(row)
         })
     return videos
 
@@ -1195,13 +1195,12 @@ else:
                         if videos:
                             full_response += "\n\n---\n\n📹 **Related Video Tutorials:**\n\n"
                             for video in videos:
-                                v_title = video['title'] if isinstance(video['title'], tuple) else video['title']
-                                v_topic = video['topic'] if isinstance(video['topic'], tuple) else video['topic']
-                                v_desc = video['description'] if isinstance(video['description'], tuple) else video['description']
-                                v_url = video['youtube_url'] if isinstance(video['youtube_url'], tuple) else video['youtube_url']
+                                # Get the clean string URL and format it for the iframe player
+                                embed_url = video['youtube_url'].replace("watch?v=", "embed/")
                                 
-                                embed_url = v_url.replace("watch?v=", "embed/")
-                                full_response += f"**Title:** {v_title}  \n**Topic:** {v_topic}  \n**Description:** {v_desc}  \n\n"
+                                full_response += f"**Title:** {video['title']}  \n"
+                                full_response += f"**Topic:** {video['topic']}  \n"
+                                full_response += f"**Description:** {video['description']}  \n\n"
                                 full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
                         else:
                             full_response += "\n\n---\n\n*Note: I searched the SQL database, but no related video tutorials were found for this topic.*"
