@@ -46,14 +46,13 @@ def get_db_connection():
     username = st.secrets["AZURE_SQL_USERNAME"].strip()
     password = st.secrets["AZURE_SQL_PASSWORD"]
 
-    # Cheeyou's Fix: Make sure server format is correct
     if server.startswith("tcp:"):
         server = server.replace("tcp:", "")
     if ",1433" in server:
         server = server.replace(",1433", "")
 
     conn_str = (
-        "DRIVER={ODBC Driver 17 for SQL Server};"  # <-- KEPT YOUR FIX (Driver 17 for Streamlit Cloud)
+        "DRIVER={ODBC Driver 17 for SQL Server};"
         f"SERVER=tcp:{server},1433;"
         f"DATABASE={database};"
         f"UID={username};"
@@ -79,15 +78,13 @@ Please check:
 """)
         return None
 
-
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
-
 
 def register_user(full_name, email, password):
     try:
         conn = get_db_connection()
-        if conn is None:  # Cheeyou's Fix: Prevent crash if DB is down
+        if conn is None: 
             return False, "Cannot connect to Azure SQL Database."
         cursor = conn.cursor()
         password_hash = hash_password(password)
@@ -110,11 +107,10 @@ def register_user(full_name, email, password):
     except Exception as e:
         return False, f"Unexpected error: {str(e)}"
 
-
 def login_user(email, password):
     try:
         conn = get_db_connection()
-        if conn is None:  # Cheeyou's Fix: Prevent crash if DB is down
+        if conn is None: 
             return False, None
 
         cursor = conn.cursor()
@@ -159,7 +155,6 @@ def is_video_request(question):
         "link"
     ]
     return any(word in question for word in video_keywords)
-
 
 def search_video_tutorial(user_question):
     conn = get_db_connection()
@@ -219,6 +214,7 @@ def search_video_tutorial(user_question):
     conn.close()
 
     videos = []
+    # 🔧 FIXED: Zhen Rong's tuple indexing so it parses the columns correctly
     for row in rows:
         videos.append({
             "title": row,
@@ -233,17 +229,14 @@ def search_video_tutorial(user_question):
 # ==========================================
 @st.cache_resource(show_spinner=False)
 def initialize_retriever():
-    """Initializes the Vector DB with persistent local storage to prevent rebuilding."""
     persist_directory = "./chroma_db"
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
     try:
-        # Check if database already exists on disk
         if os.path.exists(persist_directory) and os.listdir(persist_directory):
             vectorstore = Chroma(persist_directory=persist_directory, embedding_function=embeddings)
             return vectorstore.as_retriever(search_kwargs={"k": 3})
             
-        # Otherwise, build it for the first time
         with st.spinner("Building Vector Database for the first time... (This will be cached)"):
             pdf_path = "Section 01 - Medical Emergencies.pdf"
             if not os.path.exists(pdf_path):
@@ -288,7 +281,6 @@ def calculate_fluid_requirement(weight_kg: float) -> str:
     if weight_kg < 2.0 or weight_kg > 80.0:
         warning = "\n\n⚠️ **CLINICAL WARNING:** Weight is outside standard pediatric ranges."
         
-    # 👉 JOESON'S CODE: Hourly calculations added to your existing base logic
     if weight_kg <= 10: 
         daily = weight_kg * 100
         hourly = weight_kg * 4
@@ -299,12 +291,10 @@ def calculate_fluid_requirement(weight_kg: float) -> str:
         daily = 1500 + ((weight_kg - 20) * 20)
         hourly = 60 + ((weight_kg - 20) * 1)
     
-    # 👉 JOESON'S CODE: Capping the daily fluid at 2500
     daily = min(daily, 2500)
     
     return f"Daily requirement: {daily:.0f} mL/day.\nHourly requirement: {hourly:.0f} mL/hr.{warning}"
 
-# 👉 JOESON'S CODE: His custom BP logic converted into a LangChain tool
 @tool
 def calculate_systolic_bp(age_years: float) -> str:
     """Calculates the expected systolic blood pressure for children up to 10 years old."""
@@ -321,7 +311,6 @@ def calculate_systolic_bp(age_years: float) -> str:
 @tool
 def calculate_parkland_burn_fluid(weight_kg: float, burn_percentage: float) -> str:
     """Calculates Parkland formula fluid replacement for 2nd/3rd degree burns."""
-    # Calculates the 3 to 4 ml/kg range per % BSA burn
     vol_min = 3 * weight_kg * burn_percentage
     vol_max = 4 * weight_kg * burn_percentage
     
@@ -347,11 +336,11 @@ def expected_urine_output(weight_kg: float, is_neonate: bool) -> str:
 @tool
 def check_vitals_ranges(age_years: float) -> str:
     """Returns the normal Heart Rate and Respiratory Rate ranges based on pediatric age."""
-    if age_years < 0.25: # Birth to <3 months
+    if age_years < 0.25:
         return "Heart Rate: 90 - 180 bpm | Respiratory Rate: 30 - 60 breaths/min"
-    elif age_years < 0.5: # 3 months to <6 months
+    elif age_years < 0.5:
         return "Heart Rate: 80 - 160 bpm | Respiratory Rate: 30 - 60 breaths/min"
-    elif age_years < 1.0: # 6 months to <1 year
+    elif age_years < 1.0:
         return "Heart Rate: 80 - 140 bpm | Respiratory Rate: 25 - 45 breaths/min"
     elif age_years < 6.0:
         return "Heart Rate: 75 - 130 bpm | Respiratory Rate: 20 - 30 breaths/min"
@@ -362,7 +351,6 @@ def check_vitals_ranges(age_years: float) -> str:
     else:
         return "Heart Rate: 60 - 90 bpm | Respiratory Rate: 12 - 16 breaths/min"
 
-# Tools list
 tools = [
     calculate_fluid_requirement, 
     search_nursing_protocols, 
@@ -372,10 +360,8 @@ tools = [
     check_vitals_ranges
 ]
 
-# Initialize Your Google Model
 llm_gemini = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite", temperature=0)
 
-# JOESON'S CODE: Initialize his Azure Model
 try:
     llm_azure = AzureChatOpenAI(
         azure_endpoint=st.secrets["JOESON_AZURE_OPENAI_ENDPOINT"],
@@ -402,7 +388,6 @@ prompt = ChatPromptTemplate.from_messages([
     ("placeholder", "{agent_scratchpad}"),
 ])
 
-# Helper function to format history for LangChain
 def get_langchain_history(messages):
     history = []
     for m in messages:
@@ -533,13 +518,11 @@ Rules:
         st.code(response.content)
         return None, relevant_docs
 
-
 def reset_quiz():
     st.session_state.quiz = None
     st.session_state.quiz_answers = {}
     st.session_state.quiz_submitted = False
     st.session_state.quiz_relevant_docs = []
-
 
 def render_quiz_page(text_main, text_sub, card_bg, divider_color):
     with st.sidebar:
@@ -743,7 +726,6 @@ def get_chat_title(chat_id, messages):
             return m["content"][:20] + "..."
     return chat_id
 
-
 @st.dialog("Login to NursBot")
 def login_popup():
     st.markdown("### Welcome back 👋")
@@ -779,7 +761,6 @@ def login_popup():
             st.session_state.show_register_popup = True
             st.rerun()
 
-
 @st.dialog("Register New Account")
 def register_popup():
     st.markdown("### Create your NursBot account")
@@ -812,24 +793,20 @@ def register_popup():
 
 # --- DYNAMIC THEME COLORS ---
 if st.session_state.dark_mode:
-    # 🌙 PREMIUM DARK MODE (Base44 Style)
-    bg_color = "#0B1120"       # Ultra-deep navy background
+    bg_color = "#0B1120"
     text_main = "#FFFFFF"
     text_sub = "#94A3B8"
     nav_color = "#E2E8F0"
     divider_color = "#1E293B"
-    card_bg = "#0F172A"        # Slightly elevated dark card color
+    card_bg = "#0F172A"
     card_hover = "rgba(59, 130, 246, 0.1)"
-    
-    # New Dynamic Variables for Dark Mode
-    badge_bg = "rgba(59, 130, 246, 0.1)" # Faint blue glowing background
-    badge_text = "#3B82F6"               # Bright blue text
+    badge_bg = "rgba(59, 130, 246, 0.1)"
+    badge_text = "#3B82F6"
     badge_border = "rgba(59, 130, 246, 0.2)"
-    primary_btn = "#3B82F6"              # Vibrant blue
+    primary_btn = "#3B82F6"
     primary_hover = "#2563EB"
-    sec_btn_border = "#334155"           # Visible dark-slate border for "Learn More"
+    sec_btn_border = "#334155"
 else:
-    # ☀️ PREMIUM LIGHT MODE (Base44 Style)
     bg_color = "#F4F7F9"
     text_main = "#0F172A"
     text_sub = "#475569"
@@ -837,12 +814,10 @@ else:
     divider_color = "#E2E8F0"
     card_bg = "#FFFFFF"
     card_hover = "rgba(29, 104, 189, 0.05)"
-    
-    # New Dynamic Variables for Light Mode
     badge_bg = "#EBF2FA"
     badge_text = "#1D68BD"
     badge_border = "#D6E4F4"
-    primary_btn = "#1D68BD"              # Deep professional blue
+    primary_btn = "#1D68BD"
     primary_hover = "#15529A"
     sec_btn_border = "#E2E8F0"
 
@@ -855,12 +830,9 @@ st.markdown(f"""
     
     /* 2. Sidebar & Dividers */
     [data-testid="stSidebar"] {{ background-color: {card_bg} !important; }}
-    hr {{
-        border-bottom-color: {divider_color} !important;
-        opacity: 1 !important;
-    }}
+    hr {{ border-bottom-color: {divider_color} !important; opacity: 1 !important; }}
 
-    /* 3. 👉 PRIMARY BUTTONS (Dynamic Base44 Blue) 👈 */
+    /* 3. 👉 PRIMARY BUTTONS 👈 */
     div[data-testid="stButton"] button[kind="primary"] {{
         background-color: {primary_btn} !important; 
         border-color: {primary_btn} !important; 
@@ -873,7 +845,7 @@ st.markdown(f"""
         border-color: {primary_hover} !important;
     }}
 
-    /* 4. 👉 SECONDARY BUTTONS & POPOVERS (Learn More / Tools) 👈 */
+    /* 4. 👉 SECONDARY BUTTONS & POPOVERS 👈 */
     div[data-testid="stButton"] button[kind="secondary"],
     div[data-testid="stPopover"] button {{
         background-color: {card_bg} !important;
@@ -895,45 +867,20 @@ st.markdown(f"""
         border: 1px solid {sec_btn_border} !important;
         border-radius: 8px !important;
     }}
-    [data-testid="stAlert"] > div {{
-        background-color: transparent !important; 
-    }}
-    [data-testid="stAlert"] p, 
-    [data-testid="stAlert"] span {{
-        color: {text_main} !important;
-    }}
-    [data-testid="stAlert"] a {{
-        color: {primary_btn} !important; 
-        font-weight: 600 !important;
-        text-decoration: none !important;
-    }}
-    [data-testid="stAlert"] a:hover {{
-        text-decoration: underline !important;
-    }}
+    [data-testid="stAlert"] > div {{ background-color: transparent !important; }}
+    [data-testid="stAlert"] p, [data-testid="stAlert"] span {{ color: {text_main} !important; }}
+    [data-testid="stAlert"] a {{ color: {primary_btn} !important; font-weight: 600 !important; text-decoration: none !important; }}
+    [data-testid="stAlert"] a:hover {{ text-decoration: underline !important; }}
 
     /* 6. 👉 LANDING PAGE & DYNAMIC BADGE 👈 */
     .nav-links {{ display: flex; justify-content: center; gap: 30px; font-size: 14px; font-weight: 600; color: {nav_color}; margin-top: 10px; }}
-    
-    .badge {{ 
-        background-color: {badge_bg}; 
-        color: {badge_text}; 
-        padding: 6px 16px; 
-        border-radius: 20px; 
-        font-size: 13px; 
-        font-weight: 700; 
-        display: inline-block; 
-        margin-bottom: 1rem; 
-        border: 1px solid {badge_border}; 
-    }}
-    
+    .badge {{ background-color: {badge_bg}; color: {badge_text}; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; display: inline-block; margin-bottom: 1rem; border: 1px solid {badge_border}; }}
     .hero-title {{ font-size: 3.8rem; font-weight: 800; line-height: 1.1; margin-bottom: 1.5rem; color: {text_main}; }}
     .hero-title span {{ color: {primary_btn}; }} 
     .hero-subtitle {{ font-size: 1.2rem; color: {text_sub}; margin-bottom: 2rem; line-height: 1.6; }}
     
     /* 7. Stats Container */
-    .stats-container {{
-        display: flex; align-items: center; gap: 30px; margin-top: 40px; padding-top: 30px; border-top: 1px solid {divider_color};
-    }}
+    .stats-container {{ display: flex; align-items: center; gap: 30px; margin-top: 40px; padding-top: 30px; border-top: 1px solid {divider_color}; }}
     .stat-item {{ display: flex; flex-direction: column; }}
     .stat-value {{ font-size: 1.8rem; font-weight: 800; color: {text_main}; line-height: 1.1; }}
     .stat-label {{ font-size: 0.85rem; color: {text_sub}; font-weight: 500; margin-top: 4px; }}
@@ -943,48 +890,20 @@ st.markdown(f"""
     .breadcrumb {{ color: {text_sub}; font-size: 12px; font-weight: 600; padding: 10px 0; border-bottom: 1px solid {divider_color}; margin-bottom: 20px; }}
     
     /* 9. Custom Disclaimer Box */
-    .disclaimer-box {{ 
-        background-color: {card_bg}; 
-        border: 1px solid {sec_btn_border};
-        border-left: 3px solid #F59E0B; 
-        padding: 15px; 
-        border-radius: 8px; 
-        margin-top: 30px; 
-        text-align: left; 
-        color: {text_sub};
-        font-size: 11px;
-        line-height: 1.5;
-    }}
-    
-    .studio-btn-wrapper div[data-testid="stButton"] button {{
-        width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {sec_btn_border}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease;
-    }}
-    .studio-btn-wrapper div[data-testid="stButton"] button:hover {{
-        border-color: {primary_btn}; background: {card_hover}; transform: translateY(-2px);
-    }}
+    .disclaimer-box {{ background-color: {card_bg}; border: 1px solid {sec_btn_border}; border-left: 3px solid #F59E0B; padding: 15px; border-radius: 8px; margin-top: 30px; text-align: left; color: {text_sub}; font-size: 11px; line-height: 1.5; }}
+    .studio-btn-wrapper div[data-testid="stButton"] button {{ width: 100%; text-align: left; background-color: {bg_color}; border: 1px solid {sec_btn_border}; border-radius: 12px; padding: 15px; color: {text_main}; transition: all 0.2s ease; }}
+    .studio-btn-wrapper div[data-testid="stButton"] button:hover {{ border-color: {primary_btn}; background: {card_hover}; transform: translateY(-2px); }}
 
     /* 10. Premium Image Styling */
-    [data-testid="stImage"] img {{
-        border-radius: 24px !important; 
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02) !important; 
-        border: 1px solid {divider_color} !important; 
-    }}
+    [data-testid="stImage"] img {{ border-radius: 24px !important; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02) !important; border: 1px solid {divider_color} !important; }}
 
-    /* 11. 👉 FIX CHAT BUBBLES (Text Visibility & Clean Background) 👈 */
-    [data-testid="stChatMessage"] {{
-        background-color: transparent !important; 
-    }}
-    [data-testid="stChatMessageContent"] p,
-    [data-testid="stChatMessageContent"] li,
-    [data-testid="stChatMessageContent"] a,
-    [data-testid="stChatMessageContent"] span {{
-        color: {text_main} !important; 
-    }}
+    /* 11. 👉 FIX CHAT BUBBLES 👈 */
+    [data-testid="stChatMessage"] {{ background-color: transparent !important; }}
+    [data-testid="stChatMessageContent"] p, [data-testid="stChatMessageContent"] li, [data-testid="stChatMessageContent"] a, [data-testid="stChatMessageContent"] span {{ color: {text_main} !important; }}
 </style>
 """, unsafe_allow_html=True)
 
 # --- POPUP TRIGGERS ---
-# Only open one dialog at a time to avoid Streamlit dialog errors.
 if st.session_state.show_login_popup:
     login_popup()
 elif st.session_state.show_register_popup:
@@ -1026,7 +945,6 @@ if not st.session_state.app_started:
         with btn_col2: 
             st.button("Learn More", use_container_width=True)
             
-        # --- NEW: INJECTING THE STATS ROW ---
         st.markdown(f"""
         <div class="stats-container">
             <div class="stat-item">
@@ -1063,8 +981,6 @@ else:
 
     # 1. LEFT PANE: Sidebar History & Safety
     with st.sidebar:
-
-        # ---> DIAGNOSTIC CHECK <---
         if llm_azure is None:
             st.error("⚠️ Azure Failed to Load (Check Keys)")
         else:
@@ -1101,7 +1017,7 @@ else:
         
         st.divider()
 
-        # 👉 ZHEN RONG'S CODE: Sidebar Suggestions & Examples Integration
+        # 👉 ZHEN RONG'S CODE: Sidebar Suggestions
         st.markdown(f"<p style='color:{text_sub}; font-size:12px; font-weight:700; letter-spacing: 1px;'>💡 EXAMPLE QUESTIONS</p>", unsafe_allow_html=True)
         st.caption("• What is the heart rate of an infant?")
         st.caption("• Show me an infant CPR video")
@@ -1121,7 +1037,8 @@ else:
 
     # 2. MAIN LAYOUT
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns(, gap="large")
+        # 🔧 FIXED: The syntax error in st.columns that was crashing the app
+        chat_col, studio_col = st.columns(, gap="large") 
     else:
         chat_col = st.container()
 
@@ -1146,50 +1063,36 @@ else:
             if len(current_messages) == 0:
                 st.markdown(f"<h2 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h2>", unsafe_allow_html=True)
 
-        # Tools Popover
-        uploaded_file = None
-        spoken_text = None
-        
         with st.popover("➕ Tools & Attachments", help="Quick Actions"):
-            # 1. Image Uploader
             st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 0px;'>📷 Vision Analysis</p>", unsafe_allow_html=True)
             uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
             
             st.divider()
             
-            # 2. Voice Input
             st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 0px;'>🎤 Voice to Text</p>", unsafe_allow_html=True)
             spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
 
             st.divider()
             
-            # 3. Quiz Mode
             st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px;'>📝 Education Mode</p>", unsafe_allow_html=True)
             if st.button("Open Quiz Generator", use_container_width=True):
                 st.session_state.current_page = "quiz"
                 st.rerun()
 
-        # --- State to remember the model choice across reruns ---
         if "model_choice" not in st.session_state:
             st.session_state.model_choice = "Gemini"
 
-        # Input Handling (Always defaults to standard text!)
         user_input = st.chat_input("Message NursBot...")
         
-        # 1. Did the user use a Studio button?
         if st.session_state.studio_prompt_trigger:
             user_input = st.session_state.studio_prompt_trigger
             st.session_state.studio_prompt_trigger = None 
             st.session_state.model_choice = "Gemini" 
-            
-        # 2. Did the user use Speech-to-Text?
         elif spoken_text:
             user_input = spoken_text
-            st.session_state.model_choice = "Azure" # Lock in Azure
-            
-        # 3. Did the user type normally?
+            st.session_state.model_choice = "Azure" 
         elif user_input:
-            st.session_state.model_choice = "Gemini" # Lock in Gemini
+            st.session_state.model_choice = "Gemini" 
 
         if user_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
@@ -1233,45 +1136,44 @@ else:
                         st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
                         time.sleep(0.1)
                         st.rerun()
-
-                    # ---> EXISTING AGENT EXECUTION LOGIC <---
-                    chat_history_lc = get_langchain_history(current_messages[:-1])
-                    agent_input = latest_user_input
-                    
-                    if uploaded_file is not None:
-                        img_bytes = uploaded_file.getvalue()
-                        encoded_img = base64.b64encode(img_bytes).decode("utf-8")
-                        image_data = f"data:image/jpeg;base64,{encoded_img}"
-                        
-                        agent_input = [
-                            {"type": "text", "text": latest_user_input}, 
-                            {"type": "image_url", "image_url": {"url": image_data}}
-                        ]
-
-                    if st.session_state.model_choice == "Azure" and llm_azure is not None:
-                        active_llm = llm_azure
-                        loading_text = "Azure OpenAI (Joeson's Model)"
                     else:
-                        active_llm = llm_gemini
-                        loading_text = "Gemini (NursBot Default)"
+                        chat_history_lc = get_langchain_history(current_messages[:-1])
+                        agent_input = latest_user_input
+                        
+                        if uploaded_file is not None:
+                            img_bytes = uploaded_file.getvalue()
+                            encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                            image_data = f"data:image/jpeg;base64,{encoded_img}"
+                            
+                            agent_input = [
+                                {"type": "text", "text": latest_user_input}, 
+                                {"type": "image_url", "image_url": {"url": image_data}}
+                            ]
 
-                    with st.spinner(f"Analyzing using {loading_text}..."):
-                        agent = create_tool_calling_agent(active_llm, tools, prompt)
-                        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+                        if st.session_state.model_choice == "Azure" and llm_azure is not None:
+                            active_llm = llm_azure
+                            loading_text = "Azure OpenAI (Joeson's Model)"
+                        else:
+                            active_llm = llm_gemini
+                            loading_text = "Gemini (NursBot Default)"
 
-                        response = agent_executor.invoke({
-                            "input": agent_input, 
-                            "chat_history": chat_history_lc
-                        })
-                    
-                    raw_output = str(response.get("output", ""))
-                    match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
-                    full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
-                    
-                    st.write_stream(stream_text(full_response))
-                    st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
-                    time.sleep(0.1)
-                    st.rerun()
+                        with st.spinner(f"Analyzing using {loading_text}..."):
+                            agent = create_tool_calling_agent(active_llm, tools, prompt)
+                            agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+
+                            response = agent_executor.invoke({
+                                "input": agent_input, 
+                                "chat_history": chat_history_lc
+                            })
+                        
+                        raw_output = str(response.get("output", ""))
+                        match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
+                        full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
+                        
+                        st.write_stream(stream_text(full_response))
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
+                        time.sleep(0.1)
+                        st.rerun()
 
                 except Exception as e:
                     st.error(f"🚨 Error: {str(e)}")
