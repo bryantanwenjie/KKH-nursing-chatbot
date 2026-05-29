@@ -1051,7 +1051,7 @@ else:
         with chat_container:
             for message in current_messages:
                 with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
+                    st.markdown(message["content"], unsafe_allow_html=True)
             
             if len(current_messages) == 0:
                 st.markdown(f"<h2 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h2>", unsafe_allow_html=True)
