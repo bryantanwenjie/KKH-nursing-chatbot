@@ -127,10 +127,15 @@ def login_user(email, password):
         conn.close()
 
         if row:
+            # Force clean string extraction from the SQL tuple
+            extracted_id = row if not isinstance(row, tuple) else row
+            extracted_name = row if not isinstance(row, tuple) else row
+            extracted_email = row if not isinstance(row, tuple) else row
+
             return True, {
-                "user_id": row,
-                "full_name": row,
-                "email": row
+                "user_id": extracted_id,
+                "full_name": extracted_name,
+                "email": extracted_email
             }
         return False, None
 
