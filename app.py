@@ -1107,6 +1107,12 @@ else:
         # Dynamically show tools based on the selected mode
         if "Gemini" in selected_mode:
             uploaded_file = st.file_uploader("Upload an image for Vision Analysis", type=["png", "jpg", "jpeg"])
+            
+            # 👉 NEW: Show a thumbnail preview of the uploaded image
+            if uploaded_file is not None:
+                st.markdown("**Attached Image Preview:**")
+                st.image(uploaded_file, width=150) # 150px keeps it nice and small like a thumbnail
+                
         elif "Azure" in selected_mode:
             spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
         elif "Quiz" in selected_mode:
