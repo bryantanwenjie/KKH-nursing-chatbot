@@ -215,6 +215,7 @@ def search_video_tutorial(user_question):
 
     videos = []
     for row in rows:
+        # Force the pyodbc.Row object to break apart into normal text strings!
         videos.append({
             "title": str(row),
             "topic": str(row),
@@ -1185,9 +1186,24 @@ else:
                             "chat_history": chat_history_lc
                         })
                     
-                    raw_output = str(response.get("output", ""))
-                    match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
-                    full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
+                    # --- CLEAN OUTPUT EXTRACTION ---
+                    raw_output = response.get("output", "")
+                    
+                    # Handle Gemini's complex list format if it returns one
+                    if isinstance(raw_output, list):
+                        text_parts = []
+                        for item in raw_output:
+                            if isinstance(item, dict) and "text" in item:
+                                text_parts.append(item["text"])
+                            elif isinstance(item, str):
+                                text_parts.append(item)
+                        full_response = "".join(text_parts)
+                    else:
+                        # Standard fallback for normal text
+                        full_response = str(raw_output)
+                    
+                    # Clean up weird regex remnants just in case
+                    full_response = full_response.replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'")
                     
                     # 4. APPEND ZHEN RONG'S VIDEOS (Only if Database mode is active)
                     if "Database" in selected_mode:
@@ -1195,12 +1211,9 @@ else:
                         if videos:
                             full_response += "\n\n---\n\n📹 **Related Video Tutorials:**\n\n"
                             for video in videos:
-                                # Get the clean string URL and format it for the iframe player
+                                # Safe extraction since we fixed the database source
                                 embed_url = video['youtube_url'].replace("watch?v=", "embed/")
-                                
-                                full_response += f"**Title:** {video['title']}  \n"
-                                full_response += f"**Topic:** {video['topic']}  \n"
-                                full_response += f"**Description:** {video['description']}  \n\n"
+                                full_response += f"**Title:** {video['title']}  \n**Topic:** {video['topic']}  \n**Description:** {video['description']}  \n\n"
                                 full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
                         else:
                             full_response += "\n\n---\n\n*Note: I searched the SQL database, but no related video tutorials were found for this topic.*"
