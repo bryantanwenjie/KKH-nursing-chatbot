@@ -359,8 +359,29 @@ tools = [
     check_vitals_ranges
 ]
 
-llm_gemini = ChatGoogleGenerativeAI(model="gemini-3.1-flash-lite", temperature=0)
+# ==========================================
+# ======= LLM INITIALIZATION SECTION =======
+# ==========================================
 
+# 1. Bryan's Gemini Model
+# Uses the standard GOOGLE_API_KEY from secrets
+bryan_gemini_key = st.secrets.get("GOOGLE_API_KEY", "")
+llm_gemini_bryan = ChatGoogleGenerativeAI(
+    model="gemini-3.1-flash-lite", 
+    api_key=bryan_gemini_key,
+    temperature=0
+)
+
+# 2. Zhen Rong's Gemini Model
+# Uses the custom ZHEN_RONG_GOOGLE_API_KEY from secrets
+zhen_rong_gemini_key = st.secrets.get("ZHEN_RONG_GOOGLE_API_KEY", "")
+llm_gemini_zhenrong = ChatGoogleGenerativeAI(
+    model="gemini-1.5-flash",  # Put Zhen Rong's specific model name here
+    api_key=zhen_rong_gemini_key,
+    temperature=0
+)
+
+# 3. Joeson's Azure Model (Keep as it is)
 try:
     llm_azure = AzureChatOpenAI(
         azure_endpoint=st.secrets["JOESON_AZURE_OPENAI_ENDPOINT"],
