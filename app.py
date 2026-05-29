@@ -980,13 +980,7 @@ else:
     current_messages = st.session_state.chat_sessions[st.session_state.current_chat]
 
     # 1. LEFT PANE: Sidebar History & Safety
-    with st.sidebar:
-        if llm_azure is None:
-            st.error("⚠️ Azure Failed to Load (Check Keys)")
-        else:
-            st.success("✅ Azure is Loaded")
-
-        st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
+    with st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
 
         if st.session_state.logged_in:
             st.success(f"Logged in as {st.session_state.user_email}")
