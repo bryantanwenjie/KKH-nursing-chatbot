@@ -485,73 +485,105 @@ def create_quiz_llm():
         azure_deployment=st.secrets["CHEEYOU_AZURE_OPENAI_CHAT_DEPLOYMENT"],
     )
 
-def generate_quiz(vectorstore, llm, topic, number_of_questions):
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    relevant_docs = retriever.invoke(topic)
+def generate_clinical_scenarios(vectorstore, llm, number_of_scenarios):
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
+    relevant_docs = retriever.invoke("clinical emergency nursing scenarios protocols guidelines")
     context = "\n\n".join([doc.page_content for doc in relevant_docs])
 
-    quiz_prompt = PromptTemplate.from_template("""
+    scenario_prompt = PromptTemplate.from_template("""
 You are a nursing educator.
 
-Use ONLY the context below to generate a quiz.
+Use ONLY the PDF context below to generate clinical scenario questions.
 
 Context:
 {context}
 
-Topic:
-{topic}
+Generate exactly {number_of_scenarios} clinical scenario questions.
 
-Generate exactly {number_of_questions} multiple-choice questions.
-
-Return ONLY valid JSON.
-Do not include markdown.
-Do not include extra text.
+Return ONLY valid JSON. No markdown.
 
 JSON format:
 [
   {{
-    "question": "Question text here",
-    "options": {{
-      "A": "Option A",
-      "B": "Option B",
-      "C": "Option C",
-      "D": "Option D"
-    }},
-    "correct_answer": "A",
-    "explanation": "Short explanation here"
+    "scenario": "Patient scenario here",
+    "question": "What should the nurse do?",
+    "model_answer": "Expected answer based only on the PDF",
+    "marking_points": [
+      "point 1",
+      "point 2",
+      "point 3"
+    ]
   }}
 ]
 
 Rules:
-- Each question must have 4 options: A, B, C, D
-- correct_answer must be only A, B, C, or D
-- Use only the provided context
+- Use only the PDF context
 - Do not invent medical facts
-- Explanation must be short and simple
+- Scenario must be realistic for nursing practice
+- Model answer must be short and clear
 """)
 
-    final_prompt = quiz_prompt.format(
+    final_prompt = scenario_prompt.format(
         context=context,
-        topic=topic,
-        number_of_questions=number_of_questions
+        number_of_scenarios=number_of_scenarios
     )
 
     response = llm.invoke(final_prompt)
     cleaned_response = clean_json_response(response.content)
 
     try:
-        quiz = json.loads(cleaned_response)
-        return quiz, relevant_docs
+        scenarios = json.loads(cleaned_response)
+        return scenarios, relevant_docs
     except json.JSONDecodeError:
-        st.error("The AI did not return valid JSON.")
+        st.error("The AI did not return valid JSON for scenarios.")
         st.code(response.content)
         return None, relevant_docs
+    
+def mark_scenario_answer(llm, scenario, question, model_answer, marking_points, user_answer):
+    marking_prompt = f"""
+You are a strict nursing educator.
+
+Mark the user's answer based ONLY on the model answer and marking points.
+
+Scenario:
+{scenario}
+
+Question:
+{question}
+
+Model answer:
+{model_answer}
+
+Marking points:
+{marking_points}
+
+User answer:
+{user_answer}
+
+Return in this format:
+
+Score: X/5
+Result: Correct / Partially Correct / Incorrect
+Feedback:
+- What the user did well
+- What is missing
+- Correct explanation based on the PDF
+
+Do not add medical information outside the provided answer.
+"""
+
+    response = llm.invoke(marking_prompt)
+    return response.content
 
 def reset_quiz():
     st.session_state.quiz = None
     st.session_state.quiz_answers = {}
     st.session_state.quiz_submitted = False
     st.session_state.quiz_relevant_docs = []
+    st.session_state.scenarios = None
+    st.session_state.scenario_answers = {}
+    st.session_state.scenario_feedback = {}
+    st.session_state.scenario_relevant_docs = []
 
 def render_quiz_page(text_main, text_sub, card_bg, divider_color):
     with st.sidebar:
@@ -592,12 +624,30 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
 
         generate_button = st.button("Generate Quiz", type="primary", use_container_width=True)
 
-        if st.button("Reset Quiz", use_container_width=True):
+        st.divider()
+        st.header("🏥 Clinical Scenario Settings")
+
+        number_of_scenarios = st.number_input(
+            "Number of clinical scenario questions",
+            min_value=1,
+            max_value=10,
+            value=3,
+            step=1,
+            key="scenario_number_of_scenarios"
+        )
+
+        generate_scenarios_button = st.button(
+            "Generate Clinical Scenarios",
+            type="primary",
+            use_container_width=True
+        )
+
+        if st.button("Reset Quiz / Scenarios", use_container_width=True):
             reset_quiz()
             st.rerun()
 
     st.markdown(f"<h1 style='color:{text_main};'>📝 Nursing Quiz Generator</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:{text_sub};'>Generate multiple-choice nursing quizzes based on your Medical Emergencies PDF.</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color:{text_sub};'>Generate MCQ quizzes and clinical scenarios based on your Medical Emergencies PDF.</p>", unsafe_allow_html=True)
 
     missing_keys = check_quiz_env()
     if missing_keys:
@@ -608,6 +658,11 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
         st.stop()
 
     pdf_path = get_quiz_pdf_path()
+    # Handle the fact that get_quiz_pdf_path returns a list in app.py or a string in cheeyou
+    # Assuming app.py get_quiz_pdf_path was modified to return a single path based on Chee You's code.
+    if isinstance(pdf_path, list):
+        pdf_path = pdf_path # Failsafe
+        
     if not os.path.exists(pdf_path):
         st.error(f"PDF file not found: {pdf_path}")
         st.warning("Put your Medical Emergencies PDF in the same folder as your Streamlit app.")
@@ -621,6 +676,14 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
         st.session_state.quiz_submitted = False
     if "quiz_relevant_docs" not in st.session_state:
         st.session_state.quiz_relevant_docs = []
+    if "scenarios" not in st.session_state:
+        st.session_state.scenarios = None
+    if "scenario_answers" not in st.session_state:
+        st.session_state.scenario_answers = {}
+    if "scenario_feedback" not in st.session_state:
+        st.session_state.scenario_feedback = {}
+    if "scenario_relevant_docs" not in st.session_state:
+        st.session_state.scenario_relevant_docs = []
 
     try:
         with st.spinner("Loading quiz vector database..."):
@@ -636,7 +699,10 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
         if not topic.strip():
             st.warning("Please enter a quiz topic first.")
         else:
-            reset_quiz()
+            st.session_state.quiz = None
+            st.session_state.quiz_answers = {}
+            st.session_state.quiz_submitted = False
+            st.session_state.quiz_relevant_docs = []
             with st.spinner("Generating quiz..."):
                 quiz, relevant_docs = generate_quiz(
                     vectorstore,
@@ -650,15 +716,32 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
                 st.session_state.quiz_relevant_docs = relevant_docs
                 st.success("Quiz generated successfully!")
 
+    if generate_scenarios_button:
+        st.session_state.scenarios = None
+        st.session_state.scenario_answers = {}
+        st.session_state.scenario_feedback = {}
+        st.session_state.scenario_relevant_docs = []
+
+        with st.spinner("Generating clinical scenarios from PDF..."):
+            scenarios, relevant_docs = generate_clinical_scenarios(
+                vectorstore,
+                quiz_llm,
+                number_of_scenarios
+            )
+
+        if scenarios:
+            st.session_state.scenarios = scenarios
+            st.session_state.scenario_relevant_docs = relevant_docs
+            st.success("Clinical scenarios generated successfully!")
+
     if st.session_state.quiz:
-        st.subheader("📝 Quiz")
+        st.subheader("📝 Multiple-Choice Quiz")
 
         for i, q in enumerate(st.session_state.quiz):
             st.markdown(f"### Question {i + 1}")
             st.write(q["question"])
 
             options = q["options"]
-
             selected_answer = st.radio(
                 label="Choose your answer:",
                 options=list(options.keys()),
@@ -682,7 +765,7 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
             st.divider()
 
         if not st.session_state.quiz_submitted:
-            if st.button("Submit Answers", type="primary"):
+            if st.button("Submit Quiz Answers", type="primary"):
                 st.session_state.quiz_submitted = True
                 st.rerun()
         else:
@@ -702,13 +785,66 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
             else:
                 st.error("Keep practising. Review the PDF content again.")
 
+    if st.session_state.scenarios:
+        st.subheader("🏥 Clinical Scenario Questions")
+        st.caption("Answer in your own words. The AI will mark your answer based on the PDF-generated marking points.")
+
+        for i, s in enumerate(st.session_state.scenarios):
+            st.markdown(f"### Scenario {i + 1}")
+            st.info(s["scenario"])
+            st.write(f"**Question:** {s['question']}")
+
+            user_answer = st.text_area(
+                "Type your answer here:",
+                key=f"scenario_answer_{i}",
+                height=120
+            )
+
+            st.session_state.scenario_answers[i] = user_answer
+
+            if st.button(f"Submit Scenario {i + 1}", key=f"submit_scenario_{i}"):
+                if not user_answer.strip():
+                    st.warning("Please type your answer first.")
+                else:
+                    with st.spinner("AI is marking your answer based on the PDF..."):
+                        feedback = mark_scenario_answer(
+                            quiz_llm,
+                            s["scenario"],
+                            s["question"],
+                            s["model_answer"],
+                            s["marking_points"],
+                            user_answer
+                        )
+
+                    st.session_state.scenario_feedback[i] = feedback
+                    st.rerun()
+
+            if i in st.session_state.scenario_feedback:
+                st.success("Marked by AI")
+                st.write(st.session_state.scenario_feedback[i])
+
+            with st.expander("View model answer / marking points"):
+                st.write("**Model answer:**")
+                st.write(s["model_answer"])
+                st.write("**Marking points:**")
+                for point in s["marking_points"]:
+                    st.write(f"- {point}")
+
+            st.divider()
+
     if st.session_state.quiz_relevant_docs:
-        with st.expander("View retrieved PDF sources"):
+        with st.expander("View retrieved quiz PDF sources"):
             for i, doc in enumerate(st.session_state.quiz_relevant_docs, start=1):
                 page = doc.metadata.get("page", "Unknown")
                 st.markdown(f"#### Source {i} | Page {page}")
                 st.write(doc.page_content[:1000])
 
+    if st.session_state.scenario_relevant_docs:
+        with st.expander("View retrieved clinical scenario PDF sources"):
+            for i, doc in enumerate(st.session_state.scenario_relevant_docs, start=1):
+                page = doc.metadata.get("page", "Unknown")
+                st.markdown(f"#### Source {i} | Page {page}")
+                st.write(doc.page_content[:1000])
 
 # ==========================================
 # =========== FRONTEND UI ==================
