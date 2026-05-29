@@ -1070,7 +1070,8 @@ else:
             [
                 "🧠 Azure (Clinical/Voice)", 
                 "👁️ Gemini (Vision/Text)", 
-                "🎥 Database (Video Search)"
+                "🎥 Database (Video Search)",
+                "📝 Quiz (Education Mode)"  # 👉 ADDED CHEEYOU'S QUIZ
             ],
             horizontal=True,
             label_visibility="collapsed"
@@ -1084,6 +1085,11 @@ else:
             uploaded_file = st.file_uploader("Upload an image for Vision Analysis", type=["png", "jpg", "jpeg"])
         elif "Azure" in selected_mode:
             spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
+        elif "Quiz" in selected_mode:
+            st.info("💡 **Education Mode:** Generate multiple-choice clinical quizzes from your KKH protocols.")
+            if st.button("Launch Quiz Generator ➔", type="primary", use_container_width=True):
+                st.session_state.current_page = "quiz"
+                st.rerun()
 
         # Get Text Input
         user_input = st.chat_input("Type your message here...")
@@ -1102,7 +1108,6 @@ else:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": actual_input})
             st.rerun()
 
-    # Run AI Logic
     # Run AI Logic based on explicitly selected mode
     if len(current_messages) > 0 and current_messages[-1]["role"] == "user":
         latest_user_input = current_messages[-1]["content"]
