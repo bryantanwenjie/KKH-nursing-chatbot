@@ -980,34 +980,34 @@ else:
     current_messages = st.session_state.chat_sessions[st.session_state.current_chat]
 
     # 1. LEFT PANE: Sidebar History & Safety
-    with st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
 
-        if st.session_state.logged_in:
-            st.success(f"Logged in as {st.session_state.user_email}")
+    if st.session_state.logged_in:
+        st.success(f"Logged in as {st.session_state.user_email}")
 
-        if st.button("Logout", use_container_width=True):
-            st.session_state.logged_in = False
-            st.session_state.user_email = None
-            st.session_state.user_full_name = None
-            st.session_state.app_started = False
-            st.rerun()
+    if st.button("Logout", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.user_email = None
+        st.session_state.user_full_name = None
+        st.session_state.app_started = False
+        st.rerun()
         
-        if st.button("➕ New chat", type="primary", use_container_width=True):
-            st.session_state.chat_counter += 1
-            new_chat_name = f"Chat {st.session_state.chat_counter}"
-            st.session_state.chat_sessions[new_chat_name] = []
-            st.session_state.current_chat = new_chat_name
-            st.rerun()
+    if st.button("➕ New chat", type="primary", use_container_width=True):
+        st.session_state.chat_counter += 1
+        new_chat_name = f"Chat {st.session_state.chat_counter}"
+        st.session_state.chat_sessions[new_chat_name] = []
+        st.session_state.current_chat = new_chat_name
+        st.rerun()
             
-        st.write("<br>", unsafe_allow_html=True)
-        st.markdown(f"<p style='color:{text_sub}; font-size:12px; font-weight:700; letter-spacing: 1px;'>RECENT</p>", unsafe_allow_html=True)
+    st.write("<br>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color:{text_sub}; font-size:12px; font-weight:700; letter-spacing: 1px;'>RECENT</p>", unsafe_allow_html=True)
         
-        for chat_id in reversed(list(st.session_state.chat_sessions.keys())):
-            title = get_chat_title(chat_id, st.session_state.chat_sessions[chat_id])
-            is_active = "🔹 " if chat_id == st.session_state.current_chat else "💬 "
-            if st.button(f"{is_active}{title}", key=f"hist_{chat_id}", use_container_width=True):
-                st.session_state.current_chat = chat_id
-                st.rerun()
+    for chat_id in reversed(list(st.session_state.chat_sessions.keys())):
+        title = get_chat_title(chat_id, st.session_state.chat_sessions[chat_id])
+        is_active = "🔹 " if chat_id == st.session_state.current_chat else "💬 "
+        if st.button(f"{is_active}{title}", key=f"hist_{chat_id}", use_container_width=True):
+            st.session_state.current_chat = chat_id
+            st.rerun()
         
         st.divider()
 
