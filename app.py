@@ -769,8 +769,11 @@ def login_popup():
 
                 if success:
                     st.session_state.logged_in = True
-                    st.session_state.user_email = user["email"]
-                    st.session_state.user_full_name = user["full_name"]
+                    
+                    # Strictly grab the text strings from the user dictionary
+                    st.session_state.user_email = user.get("email", email)
+                    st.session_state.user_full_name = user.get("full_name", "User")
+                    
                     st.session_state.app_started = True
                     st.session_state.current_page = "chat"
                     st.session_state.show_login_popup = False
