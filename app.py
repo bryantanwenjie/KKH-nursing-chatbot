@@ -931,24 +931,26 @@ st.markdown(f"""
     [data-testid="stChatMessageContent"] p, [data-testid="stChatMessageContent"] li, [data-testid="stChatMessageContent"] a, [data-testid="stChatMessageContent"] span {{ color: {text_main} !important; }}
 
     /* 12. 👉 CHAT INPUT BOX 👈 */
+    /* Step 1: Force ALL inner wrappers and the text area to be fully transparent */
+    [data-testid="stChatInput"] div, 
+    [data-testid="stChatInput"] textarea, 
+    [data-testid="stChatInput"] button {{
+        background-color: transparent !important;
+    }}
+    
+    /* Step 2: Apply our custom color ONLY to the top-level visual container */
     [data-testid="stChatInput"] > div {{
         background-color: {divider_color} !important;
         border: 1px solid {sec_btn_border} !important;
         border-radius: 12px !important;
     }}
+    
+    /* Step 3: Add the blue glow when typing and ensure text is visible */
     [data-testid="stChatInput"] > div:focus-within {{
         border-color: {primary_btn} !important;
     }}
-    
-    /* 👇 NEW: Make the inner typing area transparent so no nested box appears */
     [data-testid="stChatInput"] textarea {{
-        background-color: transparent !important;
         color: {text_main} !important;
-    }}
-    
-    /* 👇 NEW: Ensure the send button area also blends seamlessly */
-    [data-testid="stChatInput"] button {{
-        background-color: transparent !important;
     }}
 </style>
 """, unsafe_allow_html=True)
