@@ -1132,13 +1132,22 @@ else:
                             if videos:
                                 full_response = "📹 **Video Tutorial Found:**\n\n"
                                 for video in videos:
-                                    full_response += (
-                                        f"**Title:** {video['title']}  \n"
-                                        f"**Topic:** {video['topic']}  \n"
-                                        f"**Description:** {video['description']}  \n"
-                                        f"**YouTube Link:** [Watch Video]({video['youtube_url']})  \n\n"
-                                        f"---\n\n"
-                                    )
+                                    # Force clean string formatting to fix the tuple bug
+                                    v_title = video['title'] if isinstance(video['title'], tuple) else video['title']
+                                    v_topic = video['topic'] if isinstance(video['topic'], tuple) else video['topic']
+                                    v_desc = video['description'] if isinstance(video['description'], tuple) else video['description']
+                                    v_url = video['youtube_url'] if isinstance(video['youtube_url'], tuple) else video['youtube_url']
+                                    
+                                    # Convert standard YouTube URL to an Embed URL
+                                    embed_url = v_url.replace("watch?v=", "embed/")
+                                    
+                                    full_response += f"**Title:** {v_title}  \n"
+                                    full_response += f"**Topic:** {v_topic}  \n"
+                                    full_response += f"**Description:** {v_desc}  \n\n"
+                                    
+                                    # Create the playable video UI
+                                    full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
+                                    full_response += "---\n\n"
                             else:
                                 full_response = (
                                     "I cannot find a related video tutorial link in the database.\n\n"
@@ -1147,6 +1156,12 @@ else:
                                     "- Blood Pressure\n"
                                     "- Heart Rate"
                                 )
+                        
+                        # Render immediately with HTML allowed (no typing stream for videos)
+                        st.markdown(full_response, unsafe_allow_html=True)
+                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
+                        time.sleep(0.1)
+                        st.rerun()
                         
                         st.write_stream(stream_text(full_response))
                         st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
