@@ -1062,42 +1062,48 @@ else:
             if len(current_messages) == 0:
                 st.markdown(f"<h2 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h2>", unsafe_allow_html=True)
 
-        with st.popover("➕ Tools & Attachments", help="Quick Actions"):
-            st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 0px;'>📷 Vision Analysis</p>", unsafe_allow_html=True)
-            uploaded_file = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
-            
-            st.divider()
-            
-            st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 0px;'>🎤 Voice to Text</p>", unsafe_allow_html=True)
+        # --- CHAT UI: MODE SELECTOR ---
+        st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px;'>🤖 Select AI Mode</p>", unsafe_allow_html=True)
+        
+        selected_mode = st.radio(
+            "AI Mode",
+            [
+                "🧠 Azure (Clinical/Voice)", 
+                "👁️ Gemini (Vision/Text)", 
+                "🎥 Database (Video Search)"
+            ],
+            horizontal=True,
+            label_visibility="collapsed"
+        )
+
+        uploaded_file = None
+        spoken_text = None
+
+        # Dynamically show tools based on the selected mode
+        if "Gemini" in selected_mode:
+            uploaded_file = st.file_uploader("Upload an image for Vision Analysis", type=["png", "jpg", "jpeg"])
+        elif "Azure" in selected_mode:
             spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
 
-            st.divider()
-            
-            st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px;'>📝 Education Mode</p>", unsafe_allow_html=True)
-            if st.button("Open Quiz Generator", use_container_width=True):
-                st.session_state.current_page = "quiz"
-                st.rerun()
+        # Get Text Input
+        user_input = st.chat_input("Type your message here...")
 
-        if "model_choice" not in st.session_state:
-            st.session_state.model_choice = "Gemini"
-
-        user_input = st.chat_input("Message NursBot...")
-        
+        # Handle Studio Prompts, Voice, or Text
         if st.session_state.studio_prompt_trigger:
-            user_input = st.session_state.studio_prompt_trigger
+            actual_input = st.session_state.studio_prompt_trigger
             st.session_state.studio_prompt_trigger = None 
-            st.session_state.model_choice = "Gemini" 
         elif spoken_text:
-            user_input = spoken_text
-            st.session_state.model_choice = "Azure" 
-        elif user_input:
-            st.session_state.model_choice = "Gemini" 
+            actual_input = spoken_text
+        else:
+            actual_input = user_input
 
-        if user_input:
-            st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": user_input})
+        # Append to history and rerun
+        if actual_input:
+            st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": actual_input})
             st.rerun()
 
     # Run AI Logic
+    # Run AI Logic based on explicitly selected mode
     if len(current_messages) > 0 and current_messages[-1]["role"] == "user":
         latest_user_input = current_messages[-1]["content"]
         with chat_container:
@@ -1108,8 +1114,10 @@ else:
                             yield word + " "
                             time.sleep(0.02)
 
-                    # 👉 ZHEN RONG'S CODE: Direct Video Request Handler Intercept
-                    if is_video_request(latest_user_input):
+                    # ==========================================
+                    # 👉 ZHEN RONG'S CODE: VIDEO SEARCH
+                    # ==========================================
+                    if "Database" in selected_mode:
                         with st.spinner("Searching video tutorials database..."):
                             videos = search_video_tutorial(latest_user_input)
                             if videos:
@@ -1135,11 +1143,16 @@ else:
                         st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
                         time.sleep(0.1)
                         st.rerun()
+
+                    # ==========================================
+                    # 👉 BRYAN & JOESON'S CODE: LLM AGENTS
+                    # ==========================================
                     else:
                         chat_history_lc = get_langchain_history(current_messages[:-1])
                         agent_input = latest_user_input
                         
-                        if uploaded_file is not None:
+                        # 1. Image Formatting (Only applies if Gemini mode is selected and file is uploaded)
+                        if uploaded_file is not None and "Gemini" in selected_mode:
                             img_bytes = uploaded_file.getvalue()
                             encoded_img = base64.b64encode(img_bytes).decode("utf-8")
                             image_data = f"data:image/jpeg;base64,{encoded_img}"
@@ -1149,13 +1162,18 @@ else:
                                 {"type": "image_url", "image_url": {"url": image_data}}
                             ]
 
-                        if st.session_state.model_choice == "Azure" and llm_azure is not None:
+                        # 2. Model Selection
+                        if "Azure" in selected_mode:
+                            if llm_azure is None:
+                                st.error("Azure OpenAI is not configured properly in secrets. Please check API keys.")
+                                st.stop()
                             active_llm = llm_azure
                             loading_text = "Azure OpenAI (Joeson's Model)"
                         else:
                             active_llm = llm_gemini
-                            loading_text = "Gemini (NursBot Default)"
+                            loading_text = "Gemini 3.1 Flash Lite (Bryan's Model)"
 
+                        # 3. Execute Selected Agent
                         with st.spinner(f"Analyzing using {loading_text}..."):
                             agent = create_tool_calling_agent(active_llm, tools, prompt)
                             agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
