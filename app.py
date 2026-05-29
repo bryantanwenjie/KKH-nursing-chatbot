@@ -1031,7 +1031,7 @@ else:
 
     # 2. MAIN LAYOUT
     if st.session_state.studio_expanded:
-        chat_col, studio_col = st.columns(, gap="large")
+        chat_col, studio_col = st.columns([2, 1], gap="large")
     else:
         chat_col = st.container()
 
