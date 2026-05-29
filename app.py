@@ -128,9 +128,9 @@ def login_user(email, password):
 
         if row:
             return True, {
-                "user_id": row,
-                "full_name": row,
-                "email": row
+                "user_id": row,    # Grabs the 1st column (user_id)
+                "full_name": row,  # Grabs the 2nd column (full_name)
+                "email": row       # Grabs the 3rd column (email)
             }
         return False, None
 
