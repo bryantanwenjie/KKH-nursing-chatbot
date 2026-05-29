@@ -1043,7 +1043,7 @@ else:
 
     # 3. CENTER PANE: Chat
     with chat_col:
-        c1, c2 = st.columns()
+        c1, c2 = st.columns(2)
         with c1:
             st.markdown(f"<div class='breadcrumb'>📁 KKH Workspace / Section 01 - Medical Emergencies</div>", unsafe_allow_html=True)
         with c2:
