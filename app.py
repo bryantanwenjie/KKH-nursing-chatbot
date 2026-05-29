@@ -1135,114 +1135,86 @@ else:
                             time.sleep(0.02)
 
                     # ==========================================
-                    # 👉 CHEEYOU'S CODE: QUIZ REDIRECT
+                    # 👉 UNIFIED CHAT & AI ROUTING
                     # ==========================================
-                    if "Quiz" in selected_mode:
-                        full_response = "I am currently in **Education Mode**. To generate a quiz, please click the **Launch Quiz Generator** button above!"
-                        st.write_stream(stream_text(full_response))
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
-                        time.sleep(0.1)
-                        st.rerun()
+                    chat_history_lc = get_langchain_history(current_messages[:-1])
+                    agent_input = latest_user_input
+                    
+                    # 1. Image Formatting (Only applies if Gemini mode is selected and file is uploaded)
+                    if uploaded_file is not None and "Gemini" in selected_mode:
+                        img_bytes = uploaded_file.getvalue()
+                        encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                        image_data = f"data:image/jpeg;base64,{encoded_img}"
+                        agent_input = [
+                            {"type": "text", "text": latest_user_input}, 
+                            {"type": "image_url", "image_url": {"url": image_data}}
+                        ]
 
-                    # ==========================================
-                    # 👉 ZHEN RONG'S CODE: VIDEO SEARCH
-                    # ==========================================
+                    # 2. STRICT MODEL ROUTING 
+                    if "Azure" in selected_mode:
+                        if llm_azure is None:
+                            st.error("Azure OpenAI is not configured in secrets. Please check Joeson's API keys.")
+                            st.stop()
+                        active_llm = llm_azure
+                        loading_text = "Azure OpenAI (Joeson's Model)"
+                        
+                    elif "Gemini" in selected_mode:
+                        active_llm = llm_gemini_bryan
+                        loading_text = "Gemini 3.1 Flash Lite (Bryan's Model)"
+                        
                     elif "Database" in selected_mode:
-                        with st.spinner("Searching video tutorials database..."):
-                            videos = search_video_tutorial(latest_user_input)
-                            if videos:
-                                full_response = "📹 **Video Tutorial Found:**\n\n"
-                                for video in videos:
-                                    # Force clean string formatting to fix the tuple bug
-                                    v_title = video['title'] if isinstance(video['title'], tuple) else video['title']
-                                    v_topic = video['topic'] if isinstance(video['topic'], tuple) else video['topic']
-                                    v_desc = video['description'] if isinstance(video['description'], tuple) else video['description']
-                                    v_url = video['youtube_url'] if isinstance(video['youtube_url'], tuple) else video['youtube_url']
-                                    
-                                    # Convert standard YouTube URL to an Embed URL
-                                    embed_url = v_url.replace("watch?v=", "embed/")
-                                    
-                                    full_response += f"**Title:** {v_title}  \n"
-                                    full_response += f"**Topic:** {v_topic}  \n"
-                                    full_response += f"**Description:** {v_desc}  \n\n"
-                                    
-                                    # Create the playable video UI
-                                    full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
-                                    full_response += "---\n\n"
-                            else:
-                                full_response = (
-                                    "I cannot find a related video tutorial link in the database.\n\n"
-                                    "**Available video topics:**\n"
-                                    "- CPR\n"
-                                    "- Blood Pressure\n"
-                                    "- Heart Rate"
-                                )
+                        active_llm = llm_gemini_zhenrong
+                        loading_text = "Gemini 2.5 Flash & Video DB (Zhen Rong's Model)"
                         
-                        # Render immediately with HTML allowed (no typing stream for videos)
+                    elif "Quiz" in selected_mode:
+                        try:
+                            # Calls Chee You's specific Azure model initialization function
+                            active_llm = create_quiz_llm()
+                            loading_text = "Azure OpenAI (Chee You's Education Model)"
+                        except Exception:
+                            st.error("Azure OpenAI is not configured in secrets. Please check Chee You's API keys.")
+                            st.stop()
+
+                    # 3. EXECUTE THE SELECTED AI
+                    with st.spinner(f"Analyzing using {loading_text}..."):
+                        agent = create_tool_calling_agent(active_llm, tools, prompt)
+                        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
+
+                        response = agent_executor.invoke({
+                            "input": agent_input, 
+                            "chat_history": chat_history_lc
+                        })
+                    
+                    raw_output = str(response.get("output", ""))
+                    match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
+                    full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
+                    
+                    # 4. APPEND ZHEN RONG'S VIDEOS (Only if Database mode is active)
+                    if "Database" in selected_mode:
+                        videos = search_video_tutorial(latest_user_input)
+                        if videos:
+                            full_response += "\n\n---\n\n📹 **Related Video Tutorials:**\n\n"
+                            for video in videos:
+                                v_title = video['title'] if isinstance(video['title'], tuple) else video['title']
+                                v_topic = video['topic'] if isinstance(video['topic'], tuple) else video['topic']
+                                v_desc = video['description'] if isinstance(video['description'], tuple) else video['description']
+                                v_url = video['youtube_url'] if isinstance(video['youtube_url'], tuple) else video['youtube_url']
+                                
+                                embed_url = v_url.replace("watch?v=", "embed/")
+                                full_response += f"**Title:** {v_title}  \n**Topic:** {v_topic}  \n**Description:** {v_desc}  \n\n"
+                                full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
+                        else:
+                            full_response += "\n\n---\n\n*Note: I searched the SQL database, but no related video tutorials were found for this topic.*"
+
+                    # 5. RENDER OUTPUT
+                    if "Database" in selected_mode:
                         st.markdown(full_response, unsafe_allow_html=True)
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
-                        time.sleep(0.1)
-                        st.rerun()
-                        
-                        st.write_stream(stream_text(full_response))
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
-                        time.sleep(0.1)
-                        st.rerun()
-
-                    # ==========================================
-                    # 👉 BRYAN & JOESON'S CODE: LLM AGENTS
-                    # ==========================================
                     else:
-                        chat_history_lc = get_langchain_history(current_messages[:-1])
-                        agent_input = latest_user_input
-                        
-                        # 1. Image Formatting (Only applies if Gemini mode is selected and file is uploaded)
-                        if uploaded_file is not None and "Gemini" in selected_mode:
-                            img_bytes = uploaded_file.getvalue()
-                            encoded_img = base64.b64encode(img_bytes).decode("utf-8")
-                            image_data = f"data:image/jpeg;base64,{encoded_img}"
-                            
-                            agent_input = [
-                                {"type": "text", "text": latest_user_input}, 
-                                {"type": "image_url", "image_url": {"url": image_data}}
-                            ]
-
-                        # 2. Model Selection based on UI Mode
-                        if "Azure" in selected_mode:
-                            if llm_azure is None:
-                                st.error("Azure OpenAI is not configured properly in secrets. Please check API keys.")
-                                st.stop()
-                            active_llm = llm_azure
-                            loading_text = "Azure OpenAI (Joeson's Model)"
-                            
-                        elif "Gemini" in selected_mode:
-                            active_llm = llm_gemini_bryan
-                            loading_text = "Gemini 3.1 Flash Lite (Bryan's Model)"
-                            
-                        elif "Database" in selected_mode:
-                            # If you ever want Zhen Rong's Gemini model to power video generation or analysis 
-                            # alongside the database search, route it here:
-                            active_llm = llm_gemini_zhenrong
-                            loading_text = "Gemini (Zhen Rong's Model)"
-
-                        # 3. Execute Selected Agent
-                        with st.spinner(f"Analyzing using {loading_text}..."):
-                            agent = create_tool_calling_agent(active_llm, tools, prompt)
-                            agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
-
-                            response = agent_executor.invoke({
-                                "input": agent_input, 
-                                "chat_history": chat_history_lc
-                            })
-                        
-                        raw_output = str(response.get("output", ""))
-                        match = re.search(r"'text':\s*['\"](.*?)['\"],\s*'index':", raw_output, re.DOTALL)
-                        full_response = match.group(1).replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'") if match else raw_output
-                        
                         st.write_stream(stream_text(full_response))
-                        st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
-                        time.sleep(0.1)
-                        st.rerun()
+                        
+                    st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
+                    time.sleep(0.1)
+                    st.rerun()
 
                 except Exception as e:
                     st.error(f"🚨 Error: {str(e)}")
