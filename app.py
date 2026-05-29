@@ -1105,13 +1105,24 @@ else:
         spoken_text = None
 
         # Dynamically show tools based on the selected mode
+        # Dynamically show tools based on the selected mode
         if "Gemini" in selected_mode:
-            uploaded_file = st.file_uploader("Upload an image for Vision Analysis", type=["png", "jpg", "jpeg"])
-            
-            # 👉 NEW: Show a thumbnail preview of the uploaded image
-            if uploaded_file is not None:
-                st.markdown("**Attached Image Preview:**")
-                st.image(uploaded_file, width=150) # 150px keeps it nice and small like a thumbnail
+            # Wrap the tools in a neat, modern bordered box
+            with st.container(border=True):
+                st.markdown("<p style='font-size: 14px; font-weight: 600; margin-bottom: 5px; color: #475569;'>👁️ Vision Analysis Panel</p>", unsafe_allow_html=True)
+                
+                # Split into two columns: 75% for the uploader, 25% for the preview
+                upload_col, preview_col = st.columns(, gap="medium")
+                
+                with upload_col:
+                    # Hide the default label to keep it clean
+                    uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+                    
+                with preview_col:
+                    if uploaded_file is not None:
+                        # Center the preview text and fit the image perfectly inside its column
+                        st.markdown("<p style='font-size: 12px; color: #475569; margin-bottom: 5px; text-align: center;'>Attached</p>", unsafe_allow_html=True)
+                        st.image(uploaded_file, use_container_width=True)
                 
         elif "Azure" in selected_mode:
             spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
