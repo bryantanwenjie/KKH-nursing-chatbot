@@ -485,6 +485,70 @@ def create_quiz_llm():
         azure_deployment=st.secrets["CHEEYOU_AZURE_OPENAI_CHAT_DEPLOYMENT"],
     )
 
+# --- 1. MCQ QUIZ GENERATOR ---
+def generate_quiz(vectorstore, llm, topic, number_of_questions):
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+    relevant_docs = retriever.invoke(topic)
+    context = "\n\n".join([doc.page_content for doc in relevant_docs])
+
+    quiz_prompt = PromptTemplate.from_template("""
+You are a nursing educator.
+
+Use ONLY the context below to generate a quiz.
+
+Context:
+{context}
+
+Topic:
+{topic}
+
+Generate exactly {number_of_questions} multiple-choice questions.
+
+Return ONLY valid JSON.
+Do not include markdown.
+Do not include extra text.
+
+JSON format:
+[
+  {{
+    "question": "Question text here",
+    "options": {{
+      "A": "Option A",
+      "B": "Option B",
+      "C": "Option C",
+      "D": "Option D"
+    }},
+    "correct_answer": "A",
+    "explanation": "Short explanation here"
+  }}
+]
+
+Rules:
+- Each question must have 4 options: A, B, C, D
+- correct_answer must be only A, B, C, or D
+- Use only the provided context
+- Do not invent medical facts
+- Explanation must be short and simple
+""")
+
+    final_prompt = quiz_prompt.format(
+        context=context,
+        topic=topic,
+        number_of_questions=number_of_questions
+    )
+
+    response = llm.invoke(final_prompt)
+    cleaned_response = clean_json_response(response.content)
+
+    try:
+        quiz = json.loads(cleaned_response)
+        return quiz, relevant_docs
+    except json.JSONDecodeError:
+        st.error("The AI did not return valid JSON.")
+        st.code(response.content)
+        return None, relevant_docs
+
+# --- 2. CLINICAL SCENARIO GENERATOR ---
 def generate_clinical_scenarios(vectorstore, llm, number_of_scenarios):
     retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
     relevant_docs = retriever.invoke("clinical emergency nursing scenarios protocols guidelines")
@@ -539,6 +603,7 @@ Rules:
         st.code(response.content)
         return None, relevant_docs
     
+# --- 3. SCENARIO MARKING AI ---
 def mark_scenario_answer(llm, scenario, question, model_answer, marking_points, user_answer):
     marking_prompt = f"""
 You are a strict nursing educator.
@@ -575,6 +640,7 @@ Do not add medical information outside the provided answer.
     response = llm.invoke(marking_prompt)
     return response.content
 
+# --- RESET LOGIC ---
 def reset_quiz():
     st.session_state.quiz = None
     st.session_state.quiz_answers = {}
