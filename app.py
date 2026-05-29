@@ -209,10 +209,14 @@ def search_video_tutorial(user_question):
         search_text
     )
 
+    # 👉 THIS IS THE LINE THAT GOT ACCIDENTALLY DELETED!
+    rows = cursor.fetchall() 
+    cursor.close()
+    conn.close()
+
     videos = []
     for row in rows:
-        # Extract each column by its exact index instead of turning the whole row into a string
-        # row = title, row = topic, row = description, row = youtube_url
+        # Extract each column by its exact index
         title_str = str(row) if row and row else "No Title"
         topic_str = str(row) if row and row else "No Topic"
         desc_str = str(row) if row and row else "No Description"
