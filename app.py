@@ -209,25 +209,26 @@ def search_video_tutorial(user_question):
         search_text
     )
 
-    # 👉 THIS IS THE LINE THAT GOT ACCIDENTALLY DELETED!
-    rows = cursor.fetchall() 
+    rows = cursor.fetchall()
     cursor.close()
     conn.close()
 
     videos = []
     for row in rows:
-        # Extract each column by its exact index
-        title_str = str(row) if row and row else "No Title"
-        topic_str = str(row) if row and row else "No Topic"
-        desc_str = str(row) if row and row else "No Description"
-        url_str = str(row) if row and row else ""
+        # Failsafe: if the database returns an unexpected number of columns, skip it
+        if len(row) != 4:
+            continue
+            
+        # Cleanly UNPACK the 4 columns directly into 4 separate variables
+        raw_title, raw_topic, raw_desc, raw_url = row
 
         videos.append({
-            "title": title_str,
-            "topic": topic_str,
-            "description": desc_str,
-            "youtube_url": url_str
+            "title": str(raw_title).strip() if raw_title else "No Title",
+            "topic": str(raw_topic).strip() if raw_topic else "No Topic",
+            "description": str(raw_desc).strip() if raw_desc else "No Description",
+            "youtube_url": str(raw_url).strip() if raw_url else ""
         })
+        
     return videos
 
 # ==========================================
