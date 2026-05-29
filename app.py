@@ -1112,7 +1112,7 @@ else:
                 st.markdown("<p style='font-size: 14px; font-weight: 600; margin-bottom: 5px; color: #475569;'>👁️ Vision Analysis Panel</p>", unsafe_allow_html=True)
                 
                 # Split into two columns: 75% for the uploader, 25% for the preview
-                upload_col, preview_col = st.columns(, gap="medium")
+                upload_col, preview_col = st.columns([2, 1], gap="medium")
                 
                 with upload_col:
                     # Hide the default label to keep it clean
