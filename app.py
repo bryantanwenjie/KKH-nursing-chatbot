@@ -929,6 +929,16 @@ st.markdown(f"""
     /* 11. 👉 FIX CHAT BUBBLES 👈 */
     [data-testid="stChatMessage"] {{ background-color: transparent !important; }}
     [data-testid="stChatMessageContent"] p, [data-testid="stChatMessageContent"] li, [data-testid="stChatMessageContent"] a, [data-testid="stChatMessageContent"] span {{ color: {text_main} !important; }}
+
+    /* 12. 👉 CHAT INPUT BOX 👈 */
+    [data-testid="stChatInput"] > div {{
+        background-color: {divider_color} !important;
+        border: 1px solid {sec_btn_border} !important;
+        border-radius: 12px !important;
+    }}
+    [data-testid="stChatInput"] > div:focus-within {{
+        border-color: {primary_btn} !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
