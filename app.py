@@ -1037,7 +1037,6 @@ else:
 
     # 2. MAIN LAYOUT
     if st.session_state.studio_expanded:
-        # 🔧 FIXED: The syntax error in st.columns that was crashing the app
         chat_col, studio_col = st.columns([2, 1], gap="large")
     else:
         chat_col = st.container()
