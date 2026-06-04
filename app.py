@@ -1457,18 +1457,20 @@ else:
                     
                     # 4. APPEND ZHEN RONG'S VIDEOS (Only if Database mode is active)
                     if "Database" in selected_mode:
-    videos = search_video_tutorial(latest_user_input)
-    if videos:
-        full_response += "\n\n---\n\n📹 **Related Video Tutorials:**\n\n"
-        for video in videos:
-            embed_url = video['youtube_url'].replace("watch?v=", "embed/")
-            
-            full_response += f"**Title:** {video['title']}  \n"
-            full_response += f"**Topic:** {video['topic']}  \n"
-            full_response += f"**Description:** {video['description']}  \n\n"
-            full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
-    else:
-        full_response += "\n\n---\n\n*Note: I searched the SQL database, but no related video tutorials were found for this topic.*"
+                        videos = search_video_tutorial(latest_user_input)
+                        if "Database" in selected_mode:
+                            videos = search_video_tutorial(latest_user_input)
+                        if videos:
+                            full_response += "\n\n---\n\n📹 **Related Video Tutorials:**\n\n"
+                            for video in videos:
+                                embed_url = video['youtube_url'].replace("watch?v=", "embed/")
+                                
+                                full_response += f"**Title:** {video['title']}  \n"
+                                full_response += f"**Topic:** {video['topic']}  \n"
+                                full_response += f"**Description:** {video['description']}  \n\n"
+                                full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
+                        else:
+                            full_response += "\n\n---\n\n*Note: I searched the SQL database, but no related video tutorials were found for this topic.*"
 
                     # 5. RENDER OUTPUT
                     if "Database" in selected_mode:
