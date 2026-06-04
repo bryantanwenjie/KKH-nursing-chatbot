@@ -375,7 +375,7 @@ tools = [
 # Uses the standard GOOGLE_API_KEY from secrets
 bryan_gemini_key = st.secrets.get("GOOGLE_API_KEY", "")
 llm_gemini_bryan = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite", 
+    model="gemini-3.5-flash",  # Put Bryan's specific model name here
     api_key=bryan_gemini_key,
     temperature=0
 )
