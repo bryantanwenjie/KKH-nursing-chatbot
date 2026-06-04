@@ -1413,7 +1413,7 @@ else:
                         
                     elif "Gemini" in selected_mode:
                         active_llm = llm_gemini_bryan
-                        loading_text = "Gemini 3.1 Flash Lite (Bryan's Model)"
+                        loading_text = "Gemini 3.5 Flash (Bryan's Model)"
                         
                     elif "Database" in selected_mode:
                         active_llm = llm_gemini_zhenrong
