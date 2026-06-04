@@ -1456,28 +1456,33 @@ else:
                     full_response = full_response.replace('\\n', '\n').replace('\\t', '\t').replace("\\'", "'")
                     
                     # 4. APPEND ZHEN RONG'S VIDEOS (Only if Database mode is active)
-                    if "Database" in selected_mode:
+                    if "Database" in selected_mode and is_video_request(latest_user_input):
                         videos = search_video_tutorial(latest_user_input)
-                        if "Database" in selected_mode:
-                            videos = search_video_tutorial(latest_user_input)
+
                         if videos:
                             full_response += "\n\n---\n\n📹 **Related Video Tutorials:**\n\n"
+
                             for video in videos:
-                                embed_url = video['youtube_url'].replace("watch?v=", "embed/")
-                                
+                                embed_url = video["youtube_url"].replace("watch?v=", "embed/")
+
                                 full_response += f"**Title:** {video['title']}  \n"
                                 full_response += f"**Topic:** {video['topic']}  \n"
                                 full_response += f"**Description:** {video['description']}  \n\n"
-                                full_response += f'<iframe width="100%" height="315" src="{embed_url}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius: 12px; margin-bottom: 20px;"></iframe>\n\n'
-                        else:
-                            full_response += "\n\n---\n\n*Note: I searched the SQL database, but no related video tutorials were found for this topic.*"
+                                full_response += (
+                                    f'<iframe width="100%" height="315" '
+                                    f'src="{embed_url}" '
+                                    f'frameborder="0" '
+                                    f'allowfullscreen '
+                                    f'style="border-radius: 12px; margin-bottom: 20px;">'
+                                    f'</iframe>\n\n'
+                                )
 
-                    # 5. RENDER OUTPUT
+                        # 5. RENDER OUTPUT
                     if "Database" in selected_mode:
-                        st.markdown(full_response, unsafe_allow_html=True)
+                            st.markdown(full_response, unsafe_allow_html=True)
                     else:
-                        st.write_stream(stream_text(full_response))
-                        
+                            st.write_stream(stream_text(full_response))
+                            
                     st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
                     time.sleep(0.1)
                     st.rerun()
