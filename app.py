@@ -411,6 +411,7 @@ prompt = ChatPromptTemplate.from_messages([
     4. If calculating fluids or BP, clearly display the math and any clinical warnings.
     5. Be concise, structured, and use bullet points for readability.
     6. IF the user asks for a video or tutorial, positively acknowledge their request, provide a brief clinical introduction, and state that you have retrieved the video from the database below. DO NOT say you cannot provide videos.
+    7. VISION & HANDWRITING RULE: When analyzing uploaded images or handwritten notes, extract the variables EXACTLY as written. If text is rotated or sideways, mentally orient it to read it correctly. If the handwriting is ambiguous or illegible, DO NOT guess or hallucinate the numbers. Explicitly state to the user that the image cannot be read safely for clinical calculations.
     """),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
