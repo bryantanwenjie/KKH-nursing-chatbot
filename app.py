@@ -1369,10 +1369,10 @@ else:
         elif "Azure" in selected_mode:
             spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
         elif "Quiz" in selected_mode:3.5
-            st.info("💡 **Education Mode:** Generate multiple-choice clinical quizzes from your KKH protocols.")
-            if st.button("Launch Quiz Generator ➔", type="primary", use_container_width=True):
-                st.session_state.current_page = "quiz"
-                st.rerun()
+        st.info("💡 **Education Mode:** Generate multiple-choice clinical quizzes from your KKH protocols.")
+        if st.button("Launch Quiz Generator ➔", type="primary", use_container_width=True):
+            st.session_state.current_page = "quiz"
+            st.rerun()
 
         # Get Text Input
         user_input = st.chat_input("Type your message here...")
