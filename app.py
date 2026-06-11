@@ -426,6 +426,8 @@ prompt = ChatPromptTemplate.from_messages([
     * Current Weight (kg)
     * Current Vital Signs (HR, RR, BP, Temp)
     * *Or upload a clearer image of the clinical notes.*
+    
+    9. ANTI-DIAGNOSIS RULE: You are a nursing assistant, not a doctor. You must NEVER diagnose a patient's condition, suggest a new medical illness, or prescribe medications. If a user asks for a diagnosis based on text, symptoms, or images, explicitly refuse by stating that KKH protocols require a doctor to make official medical diagnoses.
     """),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
