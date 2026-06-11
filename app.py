@@ -378,7 +378,7 @@ tools = [
 # Uses the standard GOOGLE_API_KEY from secrets
 bryan_gemini_key = st.secrets.get("GOOGLE_API_KEY", "")
 llm_gemini_bryan = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash",  # Put Bryan's specific model name here
+    model="gemini-2.0-flash",  # Put Bryan's specific model name here
     api_key=bryan_gemini_key,
     temperature=0
 )
@@ -1368,7 +1368,7 @@ else:
                 
         elif "Azure" in selected_mode:
             spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
-        elif "Quiz" in selected_mode:
+        elif "Quiz" in selected_mode:3.5
             st.info("💡 **Education Mode:** Generate multiple-choice clinical quizzes from your KKH protocols.")
             if st.button("Launch Quiz Generator ➔", type="primary", use_container_width=True):
                 st.session_state.current_page = "quiz"
