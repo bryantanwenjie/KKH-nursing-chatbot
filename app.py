@@ -1393,15 +1393,21 @@ else:
                     chat_history_lc = get_langchain_history(current_messages[:-1])
                     agent_input = latest_user_input
                     
-                    # 1. Image Formatting (Only applies if Gemini mode is selected and file is uploaded)
+                    # --- UPDATE IMAGE PROCESSING BLOCK ---
+                    # Image Formatting (Only applies if Gemini mode is selected and file is uploaded)
                     if uploaded_file is not None and "Gemini" in selected_mode:
                         img_bytes = uploaded_file.getvalue()
                         encoded_img = base64.b64encode(img_bytes).decode("utf-8")
-                        image_data = f"data:image/jpeg;base64,{encoded_img}"
-                        agent_input = [
-                            {"type": "text", "text": latest_user_input}, 
-                            {"type": "image_url", "image_url": {"url": image_data}}
-                        ]
+    
+                    # Dynamically extract the uploaded file's actual MIME type (e.g., image/png, image/jpeg)
+                    mime_type = uploaded_file.type 
+                    image_data = f"data:{mime_type};base64,{encoded_img}"
+    
+                    # Construct the multimodal payload for LangChain
+                    agent_input = [
+                        {"type": "text", "text": latest_user_input}, 
+                        {"type": "image_url", "image_url": {"url": image_data}}
+                    ]
 
                     # 2. STRICT MODEL ROUTING 
                     if "Azure" in selected_mode:
