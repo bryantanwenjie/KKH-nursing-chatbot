@@ -1424,11 +1424,11 @@ else:
                         
                     elif "Gemini" in selected_mode:
                         active_llm = llm_gemini_bryan
-                        loading_text = "Gemini 3.5 Flash (Bryan's Model)"
+                        loading_text = "Gemini 2.5 Flash (Bryan's Model)"
                         
                     elif "Database" in selected_mode:
                         active_llm = llm_gemini_zhenrong
-                        loading_text = "Gemini 3.5 Flash & Video DB (Zhen Rong's Model)"
+                        loading_text = "Gemini 2.5 Flash & Video DB (Zhen Rong's Model)"
                         
                     elif "Quiz" in selected_mode:
                         try:
