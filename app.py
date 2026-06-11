@@ -1391,25 +1391,12 @@ else:
                     # ==========================================
                     # 👉 UNIFIED CHAT & AI ROUTING
                     # ==========================================
+                    # ==========================================
+                    # 👉 UNIFIED CHAT & AI ROUTING
+                    # ==========================================
                     chat_history_lc = get_langchain_history(current_messages[:-1])
-                    agent_input = latest_user_input
-                    
-                    # --- UPDATE IMAGE PROCESSING BLOCK ---
-                    # 👉 FIX 3: Robust LangChain Multimodal Format
-                    if uploaded_file is not None and "Gemini" in selected_mode:
-                        img_bytes = uploaded_file.getvalue()
-                        encoded_img = base64.b64encode(img_bytes).decode("utf-8")
-                        mime_type = uploaded_file.type 
-    
-                        image_data = f"data:{mime_type};base64,{encoded_img}"
-    
-                         # Send as a strict list of content blocks
-                        agent_input = [
-                            {"type": "text", "text": latest_user_input}, 
-                            {"type": "image_url", "image_url": {"url": image_data}}
-                        ]
 
-                    # 2. STRICT MODEL ROUTING 
+                    # 1. STRICT MODEL ROUTING 
                     if "Azure" in selected_mode:
                         if llm_azure is None:
                             st.error("Azure OpenAI is not configured in secrets. Please check Joeson's API keys.")
@@ -1423,24 +1410,37 @@ else:
                         
                     elif "Database" in selected_mode:
                         active_llm = llm_gemini_zhenrong
-                        loading_text = "Gemini 2.5 Flash & Video DB (Zhen Rong's Model)"
+                        loading_text = "Gemini 3.5 Flash & Video DB (Zhen Rong's Model)"
                         
                     elif "Quiz" in selected_mode:
                         try:
-                            # Calls Chee You's specific Azure model initialization function
                             active_llm = create_quiz_llm()
                             loading_text = "Azure OpenAI (Chee You's Education Model)"
                         except Exception:
                             st.error("Azure OpenAI is not configured in secrets. Please check Chee You's API keys.")
                             st.stop()
 
+                    # 2. IMAGE PRE-EXTRACTION (The Bulletproof Fix)
+                    agent_input = latest_user_input
+
+                    if uploaded_file is not None and "Gemini" in selected_mode:
+                        img_bytes = uploaded_file.getvalue()
+                        encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                        mime_type = uploaded_file.type 
+                        image_data = f"data:{mime_type};base64,{encoded_img}"
+                        
+                        with st.spinner("Extracting handwritten clinical data..."):
+                            # Step A: Call the model directly to transcribe the image
+                            vision_msg = HumanMessage(content=[
+                                {"type": "text", "text": "Extract all text and numbers from this handwritten note perfectly. Do not solve, calculate, or explain anything. Just output the text."},
+                                {"type": "image_url", "image_url": {"url": image_data}}
+                            ])
+                            transcription = active_llm.invoke([vision_msg]).content
+                            
+                        # Step B: Inject the pure text directly into the agent's prompt
+                        agent_input = f"User Request: {latest_user_input}\n\n[Handwritten Note Contents]:\n{transcription}"
+
                     # 3. EXECUTE THE SELECTED AI
-
-                    # 👉 FIX 1: Prevent Streamlit from running if the image drops
-                    if ("attached" in latest_user_input.lower() or "image" in latest_user_input.lower()) and uploaded_file is None:
-                        st.error("⚠️ Image upload lost! Please re-attach the image before pressing enter.")
-                        st.stop()
-
                     with st.spinner(f"Analyzing using {loading_text}..."):
                         agent = create_tool_calling_agent(active_llm, tools, prompt)
                         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
