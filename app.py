@@ -252,7 +252,9 @@ def initialize_retriever():
                 
             loader = PyPDFLoader(pdf_path)
             docs = loader.load()
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+            
+            # 👉 TOKEN OPTIMIZATION: Cut chunk size in half to save tokens
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
             chunks = text_splitter.split_documents(docs)
 
             vectorstore = Chroma.from_documents(
@@ -260,7 +262,8 @@ def initialize_retriever():
                 embedding=embeddings, 
                 persist_directory=persist_directory
             )
-            return vectorstore.as_retriever(search_kwargs={"k": 3})
+            # 👉 TOKEN OPTIMIZATION: Retrieve top 2 matches instead of top 3
+            return vectorstore.as_retriever(search_kwargs={"k": 2})
             
     except Exception as e:
         st.error(f"🚨 Vector DB Error: {str(e)}")
@@ -1391,10 +1394,14 @@ else:
                     # ==========================================
                     # 👉 UNIFIED CHAT & AI ROUTING
                     # ==========================================
-                    # ==========================================
-                    # 👉 UNIFIED CHAT & AI ROUTING
-                    # ==========================================
-                    chat_history_lc = get_langchain_history(current_messages[:-1])
+
+                    # 👉 TOKEN OPTIMIZATION: Only keep the last 4 messages in memory
+                    if len(current_messages) > 4:
+                        history_to_keep = current_messages[-5:-1]
+                    else:
+                        history_to_keep = current_messages[:-1]
+                        
+                    chat_history_lc = get_langchain_history(history_to_keep)
 
                     # 1. STRICT MODEL ROUTING 
                     if "Azure" in selected_mode:
