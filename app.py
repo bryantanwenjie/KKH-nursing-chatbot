@@ -415,8 +415,17 @@ prompt = ChatPromptTemplate.from_messages([
     4. If calculating fluids or BP, clearly display the math and any clinical warnings.
     5. Be concise, structured, and use bullet points for readability.
     6. IF the user asks for a video or tutorial, positively acknowledge their request, provide a brief clinical introduction, and state that you have retrieved the video from the database below. DO NOT say you cannot provide videos.
-    7. VISION & HANDWRITING RULE: When analyzing uploaded images or handwritten notes, extract the variables EXACTLY as written. If text is rotated or sideways, mentally orient it to read it correctly. If the handwriting is ambiguous or illegible, DO NOT guess or hallucinate the numbers. Explicitly state to the user that the image cannot be read safely for clinical calculations.
-    8. TOOL EXECUTION RULE: If the user provides an image, you MUST explicitly analyze the image and extract the variables FIRST, before running any tool. NEVER invent or guess variables (like age, weight, or vitals) to use a tool. You must ONLY use the exact numbers extracted from the user's text or image. If the image is unclear, DO NOT run the tool. Tell the user you cannot read the image.
+    7. VISION & HANDWRITING RULE: When analyzing uploaded images or handwritten notes, extract the variables EXACTLY as written. If text is rotated or sideways, mentally orient it to read it correctly. If the handwriting is ambiguous or illegible, DO NOT guess or hallucinate the numbers. Halt tool execution immediately and trigger the safety formatting defined in Rule 8.
+    8. ZERO HALLUCINATION & SAFETY FORMATTING: You are strictly forbidden from inventing or guessing patient variables (like age, weight, or vitals). If you lack the required data to run a tool, or if an uploaded image is unreadable, invalid, or lacks clinical text, you MUST halt and respond using EXACTLY this Markdown template structure:
+    
+    ⚠️ **Clinical Extraction Error**
+    [Insert a concise 1-sentence explanation of exactly what is missing or why the image cannot be processed.]
+    
+    **To proceed safely in accordance with KKH protocols, please provide:**
+    * Patient's Age / DOB
+    * Current Weight (kg)
+    * Current Vital Signs (HR, RR, BP, Temp)
+    * *Or upload a clearer image of the clinical notes.*
     """),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
