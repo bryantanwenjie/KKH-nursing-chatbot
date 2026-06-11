@@ -1395,20 +1395,19 @@ else:
                     agent_input = latest_user_input
                     
                     # --- UPDATE IMAGE PROCESSING BLOCK ---
-                    # Image Formatting (Only applies if Gemini mode is selected and file is uploaded)
+                    # 👉 FIX 3: Robust LangChain Multimodal Format
                     if uploaded_file is not None and "Gemini" in selected_mode:
                         img_bytes = uploaded_file.getvalue()
                         encoded_img = base64.b64encode(img_bytes).decode("utf-8")
+                        mime_type = uploaded_file.type 
     
-                    # Dynamically extract the uploaded file's actual MIME type (e.g., image/png, image/jpeg)
-                    mime_type = uploaded_file.type 
-                    image_data = f"data:{mime_type};base64,{encoded_img}"
+                        image_data = f"data:{mime_type};base64,{encoded_img}"
     
-                    # Construct the multimodal payload for LangChain
-                    agent_input = [
-                        {"type": "text", "text": latest_user_input}, 
-                        {"type": "image_url", "image_url": {"url": image_data}}
-                    ]
+                         # Send as a strict list of content blocks
+                        agent_input = [
+                            {"type": "text", "text": latest_user_input}, 
+                            {"type": "image_url", "image_url": {"url": image_data}}
+                        ]
 
                     # 2. STRICT MODEL ROUTING 
                     if "Azure" in selected_mode:
@@ -1436,6 +1435,12 @@ else:
                             st.stop()
 
                     # 3. EXECUTE THE SELECTED AI
+
+                    # 👉 FIX 1: Prevent Streamlit from running if the image drops
+                    if ("attached" in latest_user_input.lower() or "image" in latest_user_input.lower()) and uploaded_file is None:
+                        st.error("⚠️ Image upload lost! Please re-attach the image before pressing enter.")
+                        st.stop()
+
                     with st.spinner(f"Analyzing using {loading_text}..."):
                         agent = create_tool_calling_agent(active_llm, tools, prompt)
                         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
