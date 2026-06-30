@@ -428,6 +428,11 @@ prompt = ChatPromptTemplate.from_messages([
     * *Or upload a clearer image of the clinical notes.*
     
     9. ANTI-DIAGNOSIS RULE: You are a nursing assistant, not a doctor. You must NEVER diagnose a patient's condition, suggest a new medical illness, or prescribe medications. If a user asks for a diagnosis based on text, symptoms, or images, explicitly refuse by stating that KKH protocols require a doctor to make official medical diagnoses.
+
+    10. EXPANDED MULTI-LANGUAGE ENVIRONMENT:
+    - KKH is powered by local and international nursing champions. You must understand and handle responses across: English, Mandarin Chinese, Malay, Tamil, Burmese, Bahasa Indonesia, and Tagalog.
+    - Keep search queries to the `search_nursing_protocols` tool purely in English (since the underlying clinical PDF document is in English).
+    - If a nurse interacts with you in Tagalog, Burmese, Bahasa Indonesia, etc., extract the clinical parameters, execute the English document search tools behind the scenes, and carefully translate the final clinical answers back into the user's targeted language seamlessly.
     """),
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
@@ -1174,6 +1179,52 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
+# --- EXPANDED KKH MULTI-LANGUAGE UI DICTIONARY ---
+LANG_DICT = {
+    "English": {
+        "title": "Smarter Nursing with AI Support",
+        "subtitle": "A smart chatbot designed for nurses — access clinical protocols, perform medical calculations, and learn on the go.",
+        "new_chat": "➕ New chat",
+        "launch_quiz": "Launch Quiz Generator ➔"
+    },
+    "中文 (Chinese)": {
+        "title": "人工智能支持的智能护理",
+        "subtitle": "专为护士设计的智能聊天机器人 — 获取临床方案、进行医学计算并随时随地学习。",
+        "new_chat": "➕ 新建聊天",
+        "launch_quiz": "启动测验生成器 ➔"
+    },
+    "Bahasa Melayu (Malay)": {
+        "title": "Kejururawatan Lebih Bijak dengan Sokongan AI",
+        "subtitle": "Bot sembang pintar yang direka untuk jururawat — akses protokol klinikal, lakukan pengiraan perubatan, dan belajar di mana sahaja.",
+        "new_chat": "➕ Sembang baharu",
+        "launch_quiz": "Lancar Penjana Kuiz ➔"
+    },
+    "தமிழ் (Tamil)": {
+        "title": "AI ஆதரவுடன் சிறந்த செவிலியர் பணி",
+        "subtitle": "செவிலியர்களுக்காக வடிவமைக்கப்பட்ட ஒரு ஸ்மார்ட் சாட்பாட் — மருத்துவ நெறிமுறைகளை அணுகவும், மருத்துவக் கணக்கீடுகளைச் செய்யவும், பயணத்தின்போது கற்றுக்கொள்ளவும்.",
+        "new_chat": "➕ புதிய அரட்டை",
+        "launch_quiz": "வினாடி வினா ஜெனரேட்டரைத் தொடங்கவும் ➔"
+    },
+    "Tagalog": {
+        "title": "Mas Matalinong Nursing Gamit ang AI Support",
+        "subtitle": "Isang smart chatbot para sa mga nars — i-access ang clinical protocols, magsagawa ng medikal na kalkulasyon, at matuto on the go.",
+        "new_chat": "➕ Bagong chat",
+        "launch_quiz": "I-launch ang Quiz Generator ➔"
+    },
+    "မြန်မာဘာသာ (Burmese)": {
+        "title": "AI ပံ့ပိုးမှုဖြင့် ပိုမိုစမတ်ကျသော သမားတော်လုပ်ငန်း",
+        "subtitle": "နာပြုများအတွက် ရည်ရွယ်ထားသော စမတ်ချက်ဘော့တ် — ဆေးဘက်ဆိုင်ရာ လုပ်ထုံးလုပ်နည်းများကို ကြည့်ရှုရန်၊ တွက်ချက်မှုများ ပြုလုပ်ရန်နှင့် လေ့လာရန်။",
+        "new_chat": "➕ အိုင်ကွန် အသစ်",
+        "launch_quiz": "ဉာဏ်စမ်းမေးခွန်းစနစ် ဖွင့်ပါ ➔"
+    },
+    "Bahasa Indonesia": {
+        "title": "Keperawatan Lebih Cerdas dengan Dukungan AI",
+        "subtitle": "Chatbot pintar yang dirancang untuk perawat — akses protokol klinis, lakukan perhitungan medis, dan belajar di mana saja.",
+        "new_chat": "➕ Obrolan baru",
+        "launch_quiz": "Mulai Pembuat Kuis ➔"
+    }
+}
+
 # --- POPUP TRIGGERS ---
 if st.session_state.show_login_popup:
     login_popup()
@@ -1199,11 +1250,14 @@ if not st.session_state.app_started:
     st.divider() 
     st.write("<br><br>", unsafe_allow_html=True)
     
+    # --- WE WILL DEFAULT TO ENGLISH FOR LANDING PAGE PREVIEW TO AVOID ERROR ---
+    ui_strings = LANG_DICT["English"]
+    
     col1, col2 = st.columns([1.2, 1], gap="large")
     with col1:
         st.markdown('<div class="badge">✨ AI-POWERED CLINICAL ASSISTANT</div>', unsafe_allow_html=True)
-        st.markdown('<div class="hero-title">Smarter Nursing<br>with <span>AI</span> Support</div>', unsafe_allow_html=True)
-        st.markdown('<div class="hero-subtitle">A smart chatbot designed for nurses — access clinical protocols, perform medical calculations, and learn on the go.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="hero-title">{ui_strings["title"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="hero-subtitle">{ui_strings["subtitle"]}</div>', unsafe_allow_html=True)
         
         btn_col1, btn_col2, _ = st.columns([1, 1, 1.5]) 
         with btn_col1:
@@ -1241,7 +1295,6 @@ if not st.session_state.app_started:
         except:
             st.info("Visual Placeholder: 'nurse.png' missing")
 
-
 # --- VIEW 2: APP CHAT INTERFACE ---
 else:
     if st.session_state.current_page == "quiz":
@@ -1253,6 +1306,21 @@ else:
     # 1. LEFT PANE: Sidebar History & Safety
     with st.sidebar:
         st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
+        
+        # 👉 INJECT LANGUAGE SELECTOR HERE
+        selected_lang = st.selectbox(
+            "🌐 Language / 语言 / Wika / Bahasa", 
+            [
+                "English", 
+                "中文 (Chinese)", 
+                "Bahasa Melayu (Malay)", 
+                "தமிழ் (Tamil)", 
+                "မြန်မာဘာသာ (Burmese)",
+                "Bahasa Indonesia",
+                "Tagalog"
+            ]
+        )
+        ui_strings = LANG_DICT[selected_lang]
 
         if st.session_state.logged_in:
             st.success(f"Logged in as {st.session_state.user_email}")
@@ -1264,7 +1332,8 @@ else:
             st.session_state.app_started = False
             st.rerun()
         
-        if st.button("➕ New chat", type="primary", use_container_width=True):
+        # 👉 USE DYNAMIC DICTIONARY STRING FOR BUTTON
+        if st.button(ui_strings["new_chat"], type="primary", use_container_width=True):
             st.session_state.chat_counter += 1
             new_chat_name = f"Chat {st.session_state.chat_counter}"
             st.session_state.chat_sessions[new_chat_name] = []
@@ -1367,7 +1436,18 @@ else:
                         st.image(uploaded_file, use_container_width=True)
                 
         elif "Azure" in selected_mode:
-            spoken_text = speech_to_text(language="en", use_container_width=True, just_once=True, key="STT")
+            stt_lang_mapping = {
+                "English": "en-SG",
+                "中文 (Chinese)": "zh-SG",
+                "Bahasa Melayu (Malay)": "ms-MY",
+                "தமிழ் (Tamil)": "ta-SG",
+                "မြန်မာဘာသာ (Burmese)": "my-MM",
+                "Bahasa Indonesia": "id-ID",
+                "Tagalog": "tl-PH"
+            }
+            current_stt_lang = stt_lang_mapping.get(selected_lang, "en-SG")
+            spoken_text = speech_to_text(language=current_stt_lang, use_container_width=True, just_once=True, key="STT")
+            
         elif "Quiz" in selected_mode:
             st.info("💡 **Education Mode:** Generate multiple-choice clinical quizzes from your KKH protocols.")
             if st.button("Launch Quiz Generator ➔", type="primary", use_container_width=True):
