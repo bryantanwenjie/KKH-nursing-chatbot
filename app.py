@@ -433,7 +433,11 @@ prompt = ChatPromptTemplate.from_messages([
     - KKH is powered by local and international nursing champions. You must understand and handle responses across: English, Mandarin Chinese, Malay, Tamil, Burmese, Bahasa Indonesia, and Tagalog.
     - Keep search queries to the `search_nursing_protocols` tool purely in English (since the underlying clinical PDF document is in English).
     - If a nurse interacts with you in Tagalog, Burmese, Bahasa Indonesia, etc., extract the clinical parameters, execute the English document search tools behind the scenes, and carefully translate the final clinical answers back into the user's targeted language seamlessly.
+     
+    11. ANTI-GUESSING AUDIO RULE: If the user's input text appears to be garbled, hallucinatory, or phonetically mismatched (e.g., it looks like English words forced over Malay/Chinese sounds), DO NOT attempt to guess the clinical meaning. You must immediately halt and reply exactly with:
+    "⚠️ **Audio Transcription Error:** I received unclear audio. Please ensure the language selected in the sidebar exactly matches the language you are speaking into the microphone."
     """),
+    
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
@@ -1416,7 +1420,6 @@ else:
         spoken_text = None
 
         # Dynamically show tools based on the selected mode
-        # Dynamically show tools based on the selected mode
         if "Gemini" in selected_mode:
             # Wrap the tools in a neat, modern bordered box
             with st.container(border=True):
@@ -1447,7 +1450,7 @@ else:
             }
             current_stt_lang = stt_lang_mapping.get(selected_lang, "en-SG")
             spoken_text = speech_to_text(language=current_stt_lang, use_container_width=True, just_once=True, key="STT")
-            
+
         elif "Quiz" in selected_mode:
             st.info("💡 **Education Mode:** Generate multiple-choice clinical quizzes from your KKH protocols.")
             if st.button("Launch Quiz Generator ➔", type="primary", use_container_width=True):
