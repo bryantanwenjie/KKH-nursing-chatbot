@@ -378,7 +378,7 @@ tools = [
 # Uses the standard GOOGLE_API_KEY from secrets
 bryan_gemini_key = st.secrets.get("GOOGLE_API_KEY", "")
 llm_gemini_bryan = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash-lite",  # Put Bryan's specific model name here
+    model="gemini-2.5-flash",  # Put Bryan's specific model name here
     api_key=bryan_gemini_key,
     temperature=0
 )
@@ -437,7 +437,7 @@ prompt = ChatPromptTemplate.from_messages([
     11. ANTI-GUESSING AUDIO RULE: If the user's input text appears to be garbled, hallucinatory, or phonetically mismatched (e.g., it looks like English words forced over Malay/Chinese sounds), DO NOT attempt to guess the clinical meaning. You must immediately halt and reply exactly with:
     "⚠️ **Audio Transcription Error:** I received unclear audio. Please ensure the language selected in the sidebar exactly matches the language you are speaking into the microphone."
     """),
-    
+
     ("placeholder", "{chat_history}"),
     ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
@@ -457,9 +457,7 @@ def get_langchain_history(messages):
 # ==========================================
 
 QUIZ_PDF_PATHS = [
-    "Section 01 - Medical Emergencies.pdf",
-    "Section_01_Medical Emergencies.pdf",
-    "Section_01_Medical_Emergencies.pdf",
+    "Section 01 - Medical Emergencies.pdf"
 ]
 
 def get_quiz_pdf_path():
