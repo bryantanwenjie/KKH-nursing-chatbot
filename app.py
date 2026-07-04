@@ -1470,17 +1470,7 @@ else:
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
 
-        chat_container = st.container(height=450, border=False) 
-        
-        with chat_container:
-            for message in current_messages:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"], unsafe_allow_html=True)
-            
-            if len(current_messages) == 0:
-                st.markdown(f"<h2 style='color:{text_main}; text-align:center; margin-top:100px;'>How can I help you today?</h2>", unsafe_allow_html=True)
-
-        # --- CHAT UI: MODE SELECTOR ---
+        # 👉 FIX 1: Move AI Mode Selectors to the TOP (Like ChatGPT)
         st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px;'>🤖 Select AI Mode</p>", unsafe_allow_html=True)
         
         selected_mode = st.radio(
@@ -1498,36 +1488,25 @@ else:
         uploaded_file = None
         spoken_text = None
 
-        # Dynamically show tools based on the selected mode
+        # 👉 FIX 2: Render tools at the top so they don't interrupt scrolling
         if "Gemini" in selected_mode:
-            # Wrap the tools in a neat, modern bordered box
             with st.container(border=True):
                 st.markdown("<p style='font-size: 14px; font-weight: 600; margin-bottom: 5px; color: #475569;'>👁️ Vision Analysis Panel</p>", unsafe_allow_html=True)
-                
-                # Split into two columns: 75% for the uploader, 25% for the preview
                 upload_col, preview_col = st.columns([2, 1], gap="medium")
                 
                 with upload_col:
-                    # Hide the default label to keep it clean
                     uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
                     
                 with preview_col:
                     if uploaded_file is not None:
                         st.markdown("<p style='font-size: 12px; color: #475569; margin-bottom: 5px; text-align: center;'>File Attached ✅</p>", unsafe_allow_html=True)
-                        
-                        # 👉 THE FIX: Use a popover so the image only enlarges when clicked
                         with st.popover("🔍 View Image", use_container_width=True):
                             st.image(uploaded_file, use_container_width=True)
-                
+                            
         elif "Azure" in selected_mode:
             stt_lang_mapping = {
-                "English": "en-SG",
-                "中文 (Chinese)": "zh-SG",
-                "Bahasa Melayu (Malay)": "ms-MY",
-                "தமிழ் (Tamil)": "ta-SG",
-                "မြန်မာဘာသာ (Burmese)": "my-MM",
-                "Bahasa Indonesia": "id-ID",
-                "Tagalog": "tl-PH"
+                "English": "en-SG", "中文 (Chinese)": "zh-SG", "Bahasa Melayu (Malay)": "ms-MY",
+                "தமிழ் (Tamil)": "ta-SG", "မြန်မာဘာသာ (Burmese)": "my-MM", "Bahasa Indonesia": "id-ID", "Tagalog": "tl-PH"
             }
             current_stt_lang = stt_lang_mapping.get(selected_lang, "en-SG")
             spoken_text = speech_to_text(language=current_stt_lang, use_container_width=True, just_once=True, key="STT")
@@ -1538,10 +1517,25 @@ else:
                 st.session_state.current_page = "quiz"
                 st.rerun()
 
-        # Get Text Input
+        st.divider() # Clean visual break before the chat starts
+
+        # 👉 FIX 3: Remove 'height=450' so Streamlit auto-scrolls naturally
+        chat_container = st.container(border=False) 
+        
+        with chat_container:
+            if len(current_messages) == 0:
+                # Add vertical spacing so the greeting is centered nicely
+                st.write("<br><br><br>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='color:{text_main}; text-align:center;'>How can I help you today?</h2>", unsafe_allow_html=True)
+                st.write("<br><br>", unsafe_allow_html=True)
+                
+            for message in current_messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"], unsafe_allow_html=True)
+
+        # 👉 FIX 4: The input box is now the very last element, anchoring safely to the bottom
         user_input = st.chat_input("Type your message here...")
 
-        # Handle Studio Prompts, Voice, or Text
         if st.session_state.studio_prompt_trigger:
             actual_input = st.session_state.studio_prompt_trigger
             st.session_state.studio_prompt_trigger = None 
