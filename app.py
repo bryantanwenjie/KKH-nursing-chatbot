@@ -1513,9 +1513,11 @@ else:
                     
                 with preview_col:
                     if uploaded_file is not None:
-                        # Center the preview text and fit the image perfectly inside its column
-                        st.markdown("<p style='font-size: 12px; color: #475569; margin-bottom: 5px; text-align: center;'>Attached</p>", unsafe_allow_html=True)
-                        st.image(uploaded_file, use_container_width=True)
+                        st.markdown("<p style='font-size: 12px; color: #475569; margin-bottom: 5px; text-align: center;'>File Attached ✅</p>", unsafe_allow_html=True)
+                        
+                        # 👉 THE FIX: Use a popover so the image only enlarges when clicked
+                        with st.popover("🔍 View Image", use_container_width=True):
+                            st.image(uploaded_file, use_container_width=True)
                 
         elif "Azure" in selected_mode:
             stt_lang_mapping = {
