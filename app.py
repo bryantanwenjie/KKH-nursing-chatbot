@@ -1596,17 +1596,25 @@ else:
 
         # Append to history and rerun
         if actual_input:
-            # 👉 THE FIX: Mask the data BEFORE it touches the screen or the database
-            safe_input = guard_mask_pii(actual_input)
+            # 👉 1. THE NEW FIX: Check the length limit BEFORE doing anything else
+            is_valid, error_msg = guard_validate_input(actual_input)
             
-            st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": safe_input})
-            
-            # 👉 LOG USER MESSAGE TO SQL (Now securely using safe_input)
-            current_user_id = st.session_state.get("user_id")
-            if current_user_id:
-                log_chat_message(current_user_id, st.session_state.current_chat, "user", safe_input)
+            if not is_valid:
+                # If it fails, show the error and DO NOT save to database
+                st.error(error_msg)
+            else:
+                # 👉 2. Mask the PII
+                safe_input = guard_mask_pii(actual_input)
                 
-            st.rerun()
+                # 👉 3. Save to UI
+                st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": safe_input})
+                
+                # 👉 4. Save to Azure SQL Database
+                current_user_id = st.session_state.get("user_id")
+                if current_user_id:
+                    log_chat_message(current_user_id, st.session_state.current_chat, "user", safe_input)
+                    
+                st.rerun()
 
     # Run AI Logic based on explicitly selected mode
     if len(current_messages) > 0 and current_messages[-1]["role"] == "user":
@@ -1658,14 +1666,8 @@ else:
                     # ==========================================
                     # 👉 2. PRE-EXECUTION GUARDRAILS & IMAGE EXTRACTION
                     # ==========================================
-                    
-                    # Guardrail A: Validate Input Length
-                    is_valid, error_msg = guard_validate_input(latest_user_input)
-                    if not is_valid:
-                        st.error(error_msg)
-                        st.stop()
                         
-                    # Guardrail B: Mask PII in the user's typed text
+                    # Guardrail A: Mask PII in the user's typed text
                     safe_user_input = guard_mask_pii(latest_user_input)
                     agent_input = safe_user_input
 
@@ -1683,12 +1685,12 @@ else:
                             ])
                             raw_transcription = active_llm.invoke([vision_msg]).content
                             
-                            # Guardrail C: Catch blank/unreadable images immediately
+                            # Guardrail B: Catch blank/unreadable images immediately
                             if "ERROR_BLANK" in raw_transcription or len(raw_transcription.strip()) < 3:
                                 st.warning("⚠️ **Extraction Guardrail:** The image is unreadable or lacks clear clinical data. Please type out patient vitals manually.")
                                 st.stop()
                                 
-                            # Guardrail D: Mask PII inside the extracted image text before execution
+                            # Guardrail C: Mask PII inside the extracted image text before execution
                             safe_transcription = guard_mask_pii(raw_transcription)
                             
                             # 👉 THE NEW TRIGGER: UPLOAD TO CLOUD & SAVE TO SQL
