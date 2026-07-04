@@ -1596,12 +1596,15 @@ else:
 
         # Append to history and rerun
         if actual_input:
-            st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": actual_input})
+            # 👉 THE FIX: Mask the data BEFORE it touches the screen or the database
+            safe_input = guard_mask_pii(actual_input)
             
-            # 👉 LOG USER MESSAGE TO SQL
+            st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": safe_input})
+            
+            # 👉 LOG USER MESSAGE TO SQL (Now securely using safe_input)
             current_user_id = st.session_state.get("user_id")
             if current_user_id:
-                log_chat_message(current_user_id, st.session_state.current_chat, "user", actual_input)
+                log_chat_message(current_user_id, st.session_state.current_chat, "user", safe_input)
                 
             st.rerun()
 
