@@ -1470,7 +1470,22 @@ else:
                 st.session_state.studio_expanded = not st.session_state.studio_expanded
                 st.rerun()
 
-        # 👉 FIX 1: Move AI Mode Selectors to the TOP (Like ChatGPT)
+        # 👉 The chat history renders FIRST
+        chat_container = st.container(border=False) 
+        
+        with chat_container:
+            if len(current_messages) == 0:
+                st.write("<br><br><br>", unsafe_allow_html=True)
+                st.markdown(f"<h2 style='color:{text_main}; text-align:center;'>How can I help you today?</h2>", unsafe_allow_html=True)
+                st.write("<br><br>", unsafe_allow_html=True)
+                
+            for message in current_messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"], unsafe_allow_html=True)
+
+        st.divider()
+
+        # 👉 AI Mode Selectors render SECOND (just below the chat)
         st.markdown("<p style='font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 5px;'>🤖 Select AI Mode</p>", unsafe_allow_html=True)
         
         selected_mode = st.radio(
@@ -1488,7 +1503,7 @@ else:
         uploaded_file = None
         spoken_text = None
 
-        # 👉 FIX 2: Render tools at the top so they don't interrupt scrolling
+        # 👉 Tool panels render right below the radio buttons
         if "Gemini" in selected_mode:
             with st.container(border=True):
                 st.markdown("<p style='font-size: 14px; font-weight: 600; margin-bottom: 5px; color: #475569;'>👁️ Vision Analysis Panel</p>", unsafe_allow_html=True)
@@ -1517,23 +1532,7 @@ else:
                 st.session_state.current_page = "quiz"
                 st.rerun()
 
-        st.divider() # Clean visual break before the chat starts
-
-        # 👉 FIX 3: Remove 'height=450' so Streamlit auto-scrolls naturally
-        chat_container = st.container(border=False) 
-        
-        with chat_container:
-            if len(current_messages) == 0:
-                # Add vertical spacing so the greeting is centered nicely
-                st.write("<br><br><br>", unsafe_allow_html=True)
-                st.markdown(f"<h2 style='color:{text_main}; text-align:center;'>How can I help you today?</h2>", unsafe_allow_html=True)
-                st.write("<br><br>", unsafe_allow_html=True)
-                
-            for message in current_messages:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"], unsafe_allow_html=True)
-
-        # 👉 FIX 4: The input box is now the very last element, anchoring safely to the bottom
+        # 👉 The input box renders LAST (anchored to the bottom)
         user_input = st.chat_input("Type your message here...")
 
         if st.session_state.studio_prompt_trigger:
