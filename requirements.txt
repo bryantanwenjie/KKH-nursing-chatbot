@@ -11,6 +11,7 @@ python-dotenv>=1.0.1
 protobuf<=3.20.3
 langchain-huggingface
 sentence-transformers
+azure-storage-blob
 
 # --- JOESON'S REQUIREMENTS ---
 streamlit-mic-recorder    # Required for Speech-to-Text
