@@ -263,6 +263,66 @@ def guard_validate_output(text: str) -> str:
         return "⚠️ **Clinical Guardrail Block:** As a KKH Assistant, I am prohibited from diagnosing conditions. Please consult a physician."
     return text
 
+# logging chat history to Azure SQL
+def log_chat_message(user_id, chat_session_name, role, content):
+    try:
+        conn = get_db_connection()
+        if conn is None: 
+            return False
+        cursor = conn.cursor()
+
+        query = """
+        INSERT INTO chat_history (user_id, chat_session_name, role, message_content)
+        VALUES (?, ?, ?, ?)
+        """
+        cursor.execute(query, (user_id, chat_session_name, role, content))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except pyodbc.Error as e:
+        st.error(f"Failed to log chat message: {str(e)}")
+        return False
+
+# Load chat history for a user
+def load_user_chat_history(user_id):
+    try:
+        conn = get_db_connection()
+        if conn is None: 
+            return {"New Chat": []}
+        
+        cursor = conn.cursor()
+        query = """
+        SELECT chat_session_name, role, message_content 
+        FROM chat_history 
+        WHERE user_id = ? 
+        ORDER BY created_at ASC
+        """
+        cursor.execute(query, (user_id,))
+        rows = cursor.fetchall()
+        
+        history = {}
+        for row in rows:
+            chat_name = row[0]
+            role = row[1]
+            content = row[2]
+            
+            if chat_name not in history:
+                history[chat_name] = []
+            history[chat_name].append({"role": role, "content": content})
+            
+        cursor.close()
+        conn.close()
+        
+        if history:
+            return history
+        else:
+            return {"New Chat": []}
+            
+    except pyodbc.Error as e:
+        st.error(f"Failed to load chat history: {str(e)}")
+        return {"New Chat": []}
+    
 # ==========================================
 # ======= BACKEND & CLINICAL LOGIC =========
 # ==========================================
@@ -1011,6 +1071,17 @@ def login_popup():
                     st.session_state.logged_in = True
                     st.session_state.user_email = user["email"]
                     st.session_state.user_full_name = user["full_name"]
+                    st.session_state.user_id = user["user_id"] # Capture their ID!
+                    
+                    # 👉 Fetch their history from Azure SQL
+                    st.session_state.chat_sessions = load_user_chat_history(user["user_id"])
+                    
+                    # 👉 Set the active screen to their most recent chat
+                    if st.session_state.chat_sessions and "New Chat" not in st.session_state.chat_sessions:
+                        most_recent_chat_name = list(st.session_state.chat_sessions.keys())[-1]
+                        st.session_state.current_chat = most_recent_chat_name
+                        st.session_state.chat_counter = len(st.session_state.chat_sessions)
+
                     st.session_state.app_started = True
                     st.session_state.current_page = "chat"
                     st.session_state.show_login_popup = False
@@ -1480,6 +1551,12 @@ else:
         # Append to history and rerun
         if actual_input:
             st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "user", "content": actual_input})
+            
+            # 👉 LOG USER MESSAGE TO SQL
+            current_user_id = st.session_state.get("user_id")
+            if current_user_id:
+                log_chat_message(current_user_id, st.session_state.current_chat, "user", actual_input)
+                
             st.rerun()
 
     # Run AI Logic based on explicitly selected mode
@@ -1635,6 +1712,12 @@ else:
                             st.write_stream(stream_text(full_response))
                             
                     st.session_state.chat_sessions[st.session_state.current_chat].append({"role": "assistant", "content": full_response})
+                    
+                    # 👉 LOG AI MESSAGE TO SQL
+                    current_user_id = st.session_state.get("user_id")
+                    if current_user_id:
+                        log_chat_message(current_user_id, st.session_state.current_chat, "assistant", full_response)
+                        
                     time.sleep(0.1)
                     st.rerun()
 
