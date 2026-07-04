@@ -7,6 +7,8 @@ os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 import streamlit as st
 import hashlib
 import pyodbc
+import uuid
+from azure.storage.blob import BlobServiceClient
 
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -322,6 +324,55 @@ def load_user_chat_history(user_id):
     except pyodbc.Error as e:
         st.error(f"Failed to load chat history: {str(e)}")
         return {"New Chat": []}
+
+# Upload image to Azure Blob Storage
+def upload_image_to_blob(uploaded_file):
+    try:
+        connect_str = st.secrets.get("AZURE_STORAGE_CONNECTION_STRING")
+        if not connect_str:
+            st.error("Missing Azure Storage Connection String in secrets.")
+            return None
+            
+        blob_service_client = BlobServiceClient.from_connection_string(connect_str)
+        
+        # NOTE: You must create a container named 'nursbot-notes' in your Azure Storage Account first!
+        container_name = "nursbot-notes" 
+        
+        # Randomize filename for security so patient names aren't leaked in the URL
+        file_extension = uploaded_file.name.split(".")[-1]
+        secure_filename = f"{uuid.uuid4()}.{file_extension}"
+        
+        blob_client = blob_service_client.get_blob_client(container=container_name, blob=secure_filename)
+        
+        # Upload directly from Streamlit's memory
+        blob_client.upload_blob(uploaded_file.getvalue(), overwrite=True)
+        
+        # Return the permanent link to the image
+        return blob_client.url
+    except Exception as e:
+        st.error(f"Blob Storage Upload Failed: {str(e)}")
+        return None
+
+# Log uploaded image metadata to Azure SQL
+def log_upload_to_db(user_id, blob_url, transcription):
+    try:
+        conn = get_db_connection()
+        if conn is None: 
+            return False
+        cursor = conn.cursor()
+
+        query = """
+        INSERT INTO patient_uploads (user_id, blob_url, masked_transcription)
+        VALUES (?, ?, ?)
+        """
+        cursor.execute(query, (user_id, blob_url, transcription))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+    except pyodbc.Error as e:
+        st.error(f"Failed to log upload meta: {str(e)}")
+        return False
     
 # ==========================================
 # ======= BACKEND & CLINICAL LOGIC =========
@@ -1637,7 +1688,16 @@ else:
                             # Guardrail D: Mask PII inside the extracted image text before execution
                             safe_transcription = guard_mask_pii(raw_transcription)
                             
-                        # Step B: Inject the safe, masked text directly into the agent's prompt
+                            # 👉 THE NEW TRIGGER: UPLOAD TO CLOUD & SAVE TO SQL
+                            current_user_id = st.session_state.get("user_id")
+                            if current_user_id:
+                                # 1. Upload file to Blob Storage
+                                blob_link = upload_image_to_blob(uploaded_file)
+                                # 2. Save the link and safe text to Azure SQL
+                                if blob_link:
+                                    log_upload_to_db(current_user_id, blob_link, safe_transcription)
+                                    
+                        # Package the safe text for the AI Agent
                         agent_input = f"User Request: {safe_user_input}\n\n[Handwritten Note Contents]:\n{safe_transcription}"
 
                     # ==========================================
