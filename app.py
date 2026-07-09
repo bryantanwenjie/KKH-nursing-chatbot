@@ -690,6 +690,44 @@ def load_mcq_from_mongodb(topic, number_of_questions):
         st.code(str(e))
         return []
 
+# Scenario Bank
+@st.cache_data(ttl=300, show_spinner=False)
+def load_scenarios_from_mongodb(topic, number_of_scenarios):
+    """Load Clinical Scenarios from MongoDB question bank."""
+    collection = get_mongodb_collection()
+    if collection is None:
+        return []
+
+    try:
+        # Assuming your database uses type: "scenario" for these questions
+        query = {
+            "topic_title": topic,
+            "type": "scenario" 
+        }
+        docs = list(collection.find(query))
+        if not docs:
+            return []
+
+        random.shuffle(docs)
+        selected_docs = docs[:number_of_scenarios]
+        scenarios = []
+
+        for doc in selected_docs:
+            scenario_item = {
+                "scenario": doc.get("scenario", ""),
+                "question": doc.get("question", ""),
+                # Checks for both "answer" and "model_answer" keys just in case
+                "model_answer": doc.get("answer", doc.get("model_answer", "")), 
+                "marking_points": doc.get("marking_points", [])
+            }
+            scenarios.append(scenario_item)
+        return scenarios
+
+    except Exception as e:
+        st.error("Failed to load scenarios from MongoDB.")
+        st.code(str(e))
+        return []
+    
 # --- 1. MCQ QUIZ GENERATOR ---
 def generate_quiz(vectorstore, llm, topic, number_of_questions):
     """
@@ -801,8 +839,23 @@ Rules:
     response = llm.invoke(qa_prompt)
     return response.content, relevant_docs
 
-# --- 2. CLINICAL SCENARIO GENERATOR (UPGRADED) ---
+# --- 2. CLINICAL SCENARIO GENERATOR (MONGODB FIRST) ---
 def generate_clinical_scenarios(vectorstore, llm, topic, number_of_scenarios):
+    """
+    Scenario generation priority:
+    1. Load cached scenarios from MongoDB question bank.
+    2. If MongoDB has enough, use MongoDB only.
+    3. If MongoDB does not have enough, fallback to AI generation from PDF.
+    """
+    # 1. Try MongoDB first
+    mongodb_scenarios = load_scenarios_from_mongodb(topic, number_of_scenarios)
+
+    if len(mongodb_scenarios) >= number_of_scenarios:
+        return mongodb_scenarios, []
+
+    # 2. If MongoDB is missing questions, fallback to AI
+    remaining_scenarios = number_of_scenarios - len(mongodb_scenarios)
+
     retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
     relevant_docs = retriever.invoke(topic)
     context = "\n\n".join([doc.page_content for doc in relevant_docs])
@@ -835,16 +888,25 @@ Rules:
 - Scenario must be long, realistic, and have 4 linked paragraphs.
 """)
 
-    final_prompt = scenario_prompt.format(context=context, topic=topic, number_of_scenarios=number_of_scenarios)
+    final_prompt = scenario_prompt.format(
+        context=context, 
+        topic=topic, 
+        number_of_scenarios=remaining_scenarios
+    )
+    
     response = llm.invoke(final_prompt)
     cleaned_response = clean_json_response(response.content)
 
     try:
-        scenarios = json.loads(cleaned_response)
-        return scenarios, relevant_docs
+        ai_scenarios = json.loads(cleaned_response)
+        # Combine database questions with AI-generated questions
+        final_scenarios = mongodb_scenarios + ai_scenarios
+        return final_scenarios, relevant_docs
+        
     except json.JSONDecodeError:
         st.error("The AI did not return valid JSON for scenarios.")
-        return None, relevant_docs
+        # If AI fails, still return whatever was found in the database
+        return mongodb_scenarios, relevant_docs
     
 # --- 3. SCENARIO MARKING AI ---
 def mark_scenario_answer(llm, scenario, question, model_answer, marking_points, user_answer):
