@@ -772,50 +772,70 @@ Rules:
         # If AI fails but MongoDB has some questions, still show them
         return mongodb_quiz, relevant_docs
 
-# --- 2. CLINICAL SCENARIO GENERATOR ---
-def generate_clinical_scenarios(vectorstore, llm, number_of_scenarios):
+# --- 1.5 PRE-QUIZ PDF CHATBOT ---
+def answer_quiz_page_pdf_question(vectorstore, llm, user_question):
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
+    relevant_docs = retriever.invoke(user_question)
+
+    context = "\n\n".join([
+        f"[Page {doc.metadata.get('page', 'Unknown')}]\n{doc.page_content}"
+        for doc in relevant_docs
+    ])
+
+    qa_prompt = f"""
+You are a KKH Nursing PDF assistant.
+Answer the user's question using ONLY the PDF context below.
+
+PDF context:
+{context}
+
+User question:
+{user_question}
+
+Rules:
+- Use only the PDF context.
+- If the answer is not found, say: "I cannot find this answer in the Medical Emergencies PDF."
+- Keep the answer simple and clear, use bullet points, and mention the page number.
+- Do not invent medical facts.
+"""
+    response = llm.invoke(qa_prompt)
+    return response.content, relevant_docs
+
+# --- 2. CLINICAL SCENARIO GENERATOR (UPGRADED) ---
+def generate_clinical_scenarios(vectorstore, llm, topic, number_of_scenarios):
     retriever = vectorstore.as_retriever(search_kwargs={"k": 8})
-    relevant_docs = retriever.invoke("clinical emergency nursing scenarios protocols guidelines")
+    relevant_docs = retriever.invoke(topic)
     context = "\n\n".join([doc.page_content for doc in relevant_docs])
 
     scenario_prompt = PromptTemplate.from_template("""
 You are a nursing educator.
-
 Use ONLY the PDF context below to generate clinical scenario questions.
 
 Context:
 {context}
 
-Generate exactly {number_of_scenarios} clinical scenario questions.
+Selected Topic:
+{topic}
 
-Return ONLY valid JSON. No markdown.
+Generate exactly {number_of_scenarios} clinical scenario questions based on the selected topic.
+Return ONLY valid JSON. No markdown. No extra text.
 
 JSON format:
 [
   {{
-    "scenario": "Patient scenario here",
-    "question": "What should the nurse do?",
+    "scenario": "Paragraph 1: Patient background.\\n\\nParagraph 2: Vitals.\\n\\nParagraph 3: Current actions.\\n\\nParagraph 4: Urgent situation.",
+    "question": "Based on the PDF context, what should the nurse do next and why?",
     "model_answer": "Expected answer based only on the PDF",
-    "marking_points": [
-      "point 1",
-      "point 2",
-      "point 3"
-    ]
+    "marking_points": ["point 1", "point 2", "point 3"]
   }}
 ]
 
 Rules:
-- Use only the PDF context
-- Do not invent medical facts
-- Scenario must be realistic for nursing practice
-- Model answer must be short and clear
+- Use only the PDF context. Do not invent medical facts.
+- Scenario must be long, realistic, and have 4 linked paragraphs.
 """)
 
-    final_prompt = scenario_prompt.format(
-        context=context,
-        number_of_scenarios=number_of_scenarios
-    )
-
+    final_prompt = scenario_prompt.format(context=context, topic=topic, number_of_scenarios=number_of_scenarios)
     response = llm.invoke(final_prompt)
     cleaned_response = clean_json_response(response.content)
 
@@ -824,7 +844,6 @@ Rules:
         return scenarios, relevant_docs
     except json.JSONDecodeError:
         st.error("The AI did not return valid JSON for scenarios.")
-        st.code(response.content)
         return None, relevant_docs
     
 # --- 3. SCENARIO MARKING AI ---
@@ -874,8 +893,23 @@ def reset_quiz():
     st.session_state.scenario_answers = {}
     st.session_state.scenario_feedback = {}
     st.session_state.scenario_relevant_docs = []
+    st.session_state.quiz_page_chat_messages = []
+    st.session_state.quiz_page_chat_sources = []
 
 def render_quiz_page(text_main, text_sub, card_bg, divider_color):
+    QUIZ_TOPICS = [
+        "Recognising the Critically Ill Child",
+        "Airway and Breathing Assessment",
+        "Circulation Disability Exposure and Monitoring",
+        "CPR Basics Airway Breathing and Chest Compressions",
+        "Intubation Vascular Access Fluids and Special CPR Considerations",
+        "CPR Algorithms Pulseless Arrest Bradycardia and Tachycardia",
+        "Poisoning General Approach History Examination and Disposition",
+        "Poisoning Decontamination and Enhanced Elimination",
+        "Antidotes Toxidromes and Drug Induced Presentations",
+        "Paracetamol Poisoning"
+    ]
+    
     with st.sidebar:
         st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
 
@@ -897,9 +931,9 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
         st.divider()
         st.header("⚙️ Quiz Settings")
 
-        topic = st.text_input(
-            "Enter quiz topic",
-            placeholder="Example: infant heart rate, shock, seizures, blood pressure",
+        topic = st.selectbox(
+            "Select quiz / scenario topic",
+            QUIZ_TOPICS,
             key="quiz_topic"
         )
 
@@ -1012,18 +1046,55 @@ def render_quiz_page(text_main, text_sub, card_bg, divider_color):
         st.session_state.scenario_feedback = {}
         st.session_state.scenario_relevant_docs = []
 
-        with st.spinner("Generating clinical scenarios from PDF..."):
+        with st.spinner(f"Generating clinical scenarios for: {topic}..."):
+            # 👉 We now pass 'topic' to the scenario generator
             scenarios, relevant_docs = generate_clinical_scenarios(
                 vectorstore,
                 quiz_llm,
+                topic,
                 number_of_scenarios
             )
 
         if scenarios:
             st.session_state.scenarios = scenarios
             st.session_state.scenario_relevant_docs = relevant_docs
-            st.success("Clinical scenarios generated successfully!")
+            st.success(f"Clinical scenarios generated successfully for: {topic}")
 
+    # =====================================================
+    # 👉 CHEE YOU'S PRE-QUIZ CHATBOT UI
+    # =====================================================
+    if not st.session_state.quiz and not st.session_state.scenarios:
+        if "quiz_page_chat_messages" not in st.session_state:
+            st.session_state.quiz_page_chat_messages = []
+            
+        st.subheader("💬 Ask the Medical Emergencies PDF")
+        st.info("Before generating a quiz or clinical scenario, you can ask questions based on Section 01 - Medical Emergencies.pdf.")
+
+        for msg in st.session_state.quiz_page_chat_messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        pdf_question = st.chat_input("Ask something from the Medical Emergencies PDF...")
+
+        if pdf_question:
+            st.session_state.quiz_page_chat_messages.append({"role": "user", "content": pdf_question})
+            with st.spinner("Searching PDF and generating answer using Azure OpenAI..."):
+                answer, source_docs = answer_quiz_page_pdf_question(vectorstore, quiz_llm, pdf_question)
+            
+            st.session_state.quiz_page_chat_messages.append({"role": "assistant", "content": answer})
+            st.session_state.quiz_page_chat_sources = source_docs
+            st.rerun()
+
+        if st.session_state.get("quiz_page_chat_sources"):
+            with st.expander("View PDF sources used for this answer"):
+                for i, doc in enumerate(st.session_state.quiz_page_chat_sources, start=1):
+                    page = doc.metadata.get("page", "Unknown")
+                    st.markdown(f"#### Source {i} | Page {page}")
+                    st.write(doc.page_content[:1000])
+
+    # =====================================================
+    # MULTIPLE-CHOICE QUIZ DISPLAY
+    # =====================================================
     if st.session_state.quiz:
         st.subheader("📝 Multiple-Choice Quiz")
 
