@@ -8,8 +8,9 @@ import streamlit as st
 import hashlib
 import pyodbc
 import uuid
+import pymongo
+import random
 from azure.storage.blob import BlobServiceClient
-
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -20,6 +21,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage, AIMessage
+from pymongo import MongoClient
 
 # 👉 JOESON'S CODE: Imports for Azure and Speech-to-Text
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
@@ -630,10 +632,84 @@ def create_quiz_llm():
         azure_deployment=st.secrets["CHEEYOU_AZURE_OPENAI_CHAT_DEPLOYMENT"],
     )
 
+# ==========================================
+# =========== MONGODB QUIZ BANK ============
+# ==========================================
+@st.cache_resource(show_spinner=False)
+def get_mongodb_collection():
+    """Connect to MongoDB question bank in Streamlit Cloud or Local."""
+    try:
+        mongo_uri = st.secrets.get("MONGODB_URI", "mongodb+srv://cheeyou0128_db_user:44GIxzvklPpM26eE@cluster0.vy4fsh2.mongodb.net/")
+        client = MongoClient(mongo_uri)
+        db = client[st.secrets.get("MONGODB_DB", "mydb")]
+        collection = db[st.secrets.get("MONGODB_COLLECTION", "FypquestionBank")]
+        return collection
+    except Exception as e:
+        st.error("MongoDB connection failed.")
+        st.code(str(e))
+        return None
+
+@st.cache_data(ttl=300, show_spinner=False)
+def load_mcq_from_mongodb(topic, number_of_questions):
+    """Load MCQ questions from MongoDB question bank."""
+    collection = get_mongodb_collection()
+    if collection is None:
+        return []
+
+    try:
+        query = {
+            "topic_title": topic,
+            "type": "mcq"
+        }
+        docs = list(collection.find(query))
+        if not docs:
+            return []
+
+        random.shuffle(docs)
+        selected_docs = docs[:number_of_questions]
+        quiz = []
+
+        for doc in selected_docs:
+            options = doc.get("options", {})
+            question_item = {
+                "question": doc.get("question", ""),
+                "options": {
+                    "A": options.get("A", ""),
+                    "B": options.get("B", ""),
+                    "C": options.get("C", ""),
+                    "D": options.get("D", "")
+                },
+                "correct_answer": doc.get("answer", "").strip().upper(),
+                "explanation": doc.get("explanation", "")
+            }
+            quiz.append(question_item)
+        return quiz
+
+    except Exception as e:
+        st.error("Failed to load quiz questions from MongoDB.")
+        st.code(str(e))
+        return []
+
 # --- 1. MCQ QUIZ GENERATOR ---
 def generate_quiz(vectorstore, llm, topic, number_of_questions):
+    """
+    Quiz generation priority:
+    1. Try to load cached MCQ questions from MongoDB question bank.
+    2. If MongoDB has enough questions, use MongoDB only.
+    3. If MongoDB does not have enough questions, fallback to AI generation from PDF.
+    """
+    # 1. Try MongoDB first
+    mongodb_quiz = load_mcq_from_mongodb(topic, number_of_questions)
+
+    if len(mongodb_quiz) >= number_of_questions:
+        return mongodb_quiz, []
+
+    # 2. If MongoDB has some but not enough, continue with AI fallback
+    remaining_questions = number_of_questions - len(mongodb_quiz)
+
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
     relevant_docs = retriever.invoke(topic)
+
     context = "\n\n".join([doc.page_content for doc in relevant_docs])
 
     quiz_prompt = PromptTemplate.from_template("""
@@ -679,19 +755,22 @@ Rules:
     final_prompt = quiz_prompt.format(
         context=context,
         topic=topic,
-        number_of_questions=number_of_questions
+        number_of_questions=remaining_questions
     )
 
     response = llm.invoke(final_prompt)
     cleaned_response = clean_json_response(response.content)
 
     try:
-        quiz = json.loads(cleaned_response)
-        return quiz, relevant_docs
+        ai_quiz = json.loads(cleaned_response)
+        final_quiz = mongodb_quiz + ai_quiz
+        return final_quiz, relevant_docs
+
     except json.JSONDecodeError:
         st.error("The AI did not return valid JSON.")
         st.code(response.content)
-        return None, relevant_docs
+        # If AI fails but MongoDB has some questions, still show them
+        return mongodb_quiz, relevant_docs
 
 # --- 2. CLINICAL SCENARIO GENERATOR ---
 def generate_clinical_scenarios(vectorstore, llm, number_of_scenarios):

@@ -22,3 +22,4 @@ faiss-cpu                  # Required for Joeson's Vector Store
 pyodbc
 torch
 torchvision
+pymongo==4.6.2
