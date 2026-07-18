@@ -22,4 +22,5 @@ faiss-cpu                  # Required for Joeson's Vector Store
 pyodbc
 torch
 torchvision
-pymongo==4.6.2
+pymongo==4.6.3
+dnspython==2.6.1
