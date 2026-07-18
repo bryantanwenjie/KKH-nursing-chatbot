@@ -648,64 +648,66 @@ def guard_validate_output(text: str) -> str:
 
     return text
 
-# logging chat history to Azure SQL
+# logging chat history to MongoDB
 def log_chat_message(user_id, chat_session_name, role, content):
     try:
-        conn = get_db_connection()
-        if conn is None: 
+        mongo_uri = get_config("MONGODB_URI", "mongodb+srv://cheeyou0128_db_user:44GIxzvklPpM26eE@cluster0.vy4fsh2.mongodb.net/")
+        if not mongo_uri:
             return False
-        cursor = conn.cursor()
+            
+        client = MongoClient(mongo_uri)
+        db = client[get_config("MONGODB_DB", "mydb")]
+        # Creates or accesses a dedicated 'chat_history' collection
+        collection = db["chat_history"]
 
-        query = """
-        INSERT INTO chat_history (user_id, chat_session_name, role, message_content)
-        VALUES (?, ?, ?, ?)
-        """
-        cursor.execute(query, (user_id, chat_session_name, role, content))
-        conn.commit()
-        cursor.close()
-        conn.close()
+        chat_document = {
+            "user_id": user_id,
+            "chat_session_name": chat_session_name,
+            "role": role,
+            "message_content": content,
+            "created_at": time.time()  # Using timestamps to preserve ordering
+        }
+        
+        collection.insert_one(chat_document)
+        client.close()
         return True
-    except pyodbc.Error as e:
-        st.error(f"Failed to log chat message: {str(e)}")
+    except Exception as e:
+        st.error(f"Failed to log chat message to MongoDB: {str(e)}")
         return False
 
-# Load chat history for a user
+# Load chat history for a user from MongoDB
 def load_user_chat_history(user_id):
     try:
-        conn = get_db_connection()
-        if conn is None: 
+        mongo_uri = get_config("MONGODB_URI", "mongodb+srv://cheeyou0128_db_user:44GIxzvklPpM26eE@cluster0.vy4fsh2.mongodb.net/")
+        if not mongo_uri:
             return {"New Chat": []}
+            
+        client = MongoClient(mongo_uri)
+        db = client[get_config("MONGODB_DB", "mydb")]
+        collection = db["chat_history"]
         
-        cursor = conn.cursor()
-        query = """
-        SELECT chat_session_name, role, message_content 
-        FROM chat_history 
-        WHERE user_id = ? 
-        ORDER BY created_at ASC
-        """
-        cursor.execute(query, (user_id,))
-        rows = cursor.fetchall()
+        # Query logs matching the user_id, sorted by creation time ascending (1)
+        cursor = collection.find({"user_id": user_id}).sort("created_at", 1)
         
         history = {}
-        for row in rows:
-            chat_name = row[0]
-            role = row[1]
-            content = row[2]
+        for doc in cursor:
+            chat_name = doc.get("chat_session_name", "New Chat")
+            role = doc.get("role")
+            content = doc.get("message_content")
             
             if chat_name not in history:
                 history[chat_name] = []
             history[chat_name].append({"role": role, "content": content})
             
-        cursor.close()
-        conn.close()
+        client.close()
         
         if history:
             return history
         else:
             return {"New Chat": []}
             
-    except pyodbc.Error as e:
-        st.error(f"Failed to load chat history: {str(e)}")
+    except Exception as e:
+        st.error(f"Failed to load chat history from MongoDB: {str(e)}")
         return {"New Chat": []}
 
 # Upload image to Azure Blob Storage
