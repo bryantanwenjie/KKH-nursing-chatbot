@@ -2308,7 +2308,18 @@ else:
         st.markdown(f"<h3 style='color:{text_main}; margin-top:-20px;'>🩺 NursBot</h3>", unsafe_allow_html=True)
         
         # 👉 INJECT LANGUAGE SELECTOR HERE
-        selected_lang = "English"
+        selected_lang = st.selectbox(
+            "🌐 Language / 语言 / Wika / Bahasa", 
+            [
+                "English", 
+                "中文 (Chinese)", 
+                "Bahasa Melayu (Malay)", 
+                "தமிழ் (Tamil)", 
+                "မြန်မာဘာသာ (Burmese)",
+                "Bahasa Indonesia",
+                "Tagalog"
+            ]
+        )
         ui_strings = LANG_DICT[selected_lang]
 
         if st.session_state.logged_in:
