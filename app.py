@@ -930,7 +930,7 @@ tools = [
 bryan_gemini_key = get_config("GOOGLE_API_KEY", "")
 llm_gemini_bryan = (
     ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         api_key=bryan_gemini_key,
         temperature=0,
     )
